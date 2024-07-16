@@ -32,7 +32,6 @@ The RAG-based chatbot serves as a practical example of these concepts, providing
 
 The repository is structured as follows:
 
-- `data/`: Contains datasets used for training and evaluation.
 - `models/`: Pretrained models and scripts for fine-tuning.
 - `scripts/`: Utility scripts for various tasks.
 - `notebooks/`: Jupyter notebooks for exploratory data analysis and experimentation.
