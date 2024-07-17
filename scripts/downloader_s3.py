@@ -1,6 +1,8 @@
 import boto3
 import json
 import sys
+import io
+import pandas as pd
 
 def download_from_s3(bucket_name, file_key):
     """
@@ -18,6 +20,22 @@ def download_from_s3(bucket_name, file_key):
     #file_content = response['Body'].read().decode('utf-8')  # Read and decode the content
     return response  # Parse and return the content as a JSON object
 
+def download_csv_from_s3(bucket_name, file_key):
+    """
+    Downloads a CSV file from an S3 bucket and returns its content as a pandas DataFrame.
+
+    Parameters:
+    - bucket_name (str): The name of the S3 bucket.
+    - file_key (str): The key of the file to download.
+
+    Returns:
+    - pandas.DataFrame: The content of the downloaded CSV file.
+    """
+    s3 = boto3.client('s3')  # Create an S3 client
+    response = s3.get_object(Bucket=bucket_name, Key=file_key)  # Get the object from S3
+    file_content = response['Body'].read().decode('utf-8')  # Read and decode the content
+    data = pd.read_csv(io.StringIO(file_content))
+    return data
 
 def upload_to_s3(bucket_name, file_key, data):
     """
