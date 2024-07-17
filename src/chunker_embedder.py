@@ -1,12 +1,16 @@
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+
+from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3
 from html_retriever_cleaner import HTMLCleaner
-from downloader_s3 import S3Downloader
+
 
 BUCKET_NAME = 'hu-chatbot-schema'
-JSON_KEY = 'json_files/updated_all_matches.json'
+S3_KEY = 'csv_files/cleaned/data.csv'
 
 # Download the JSON data
-processor = S3Downloader(BUCKET_NAME, JSON_KEY)
-content = processor.download_json()
+file  = download_from_s3(BUCKET_NAME, S3_KEY)
+
 
 
 processor = HTMLCleaner(content)
