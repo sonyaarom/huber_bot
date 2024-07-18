@@ -22,7 +22,7 @@ data = download_csv_from_s3(BUCKET_NAME, S3_KEY)
 
 embed_model = HuggingFaceEmbeddings()
 
-def chunk_text(text, max_length=500, overlap=100, separators=None):
+def chunk_text(text, max_length=450, overlap=100, separators=None):
     """
     Splits the input text into chunks of specified maximum length with optional overlap.
 
@@ -94,16 +94,16 @@ def expand_dataframe_with_embeddings(data, embed_model):
     # Iterate over the DataFrame
     for _, row in data.iterrows():
         for chunk in row['chunk']:
-            #embedding = embed_model.get_text_embedding(chunk)
-            embedding = embed_model.embed_documents(chunk)
+            # Ensure chunk is treated as a string, not as a list
+            chunk_str = chunk if isinstance(chunk, str) else ' '.join(chunk)
+            embedding = embed_model.embed_documents([chunk_str])
             new_rows.append({
                 'id': row['id'],
                 'url': row['url'],
                 'last_updated': row['last_updated'],
                 'html_content': row['html_content'],
-                'extracted_texts': row['extracted_texts'],
-                'len': len(chunk),
-                'chunk': chunk,
+                'text': chunk_str,  # Ensure text is stored as a string
+                'len': len(chunk_str),
                 'embedding': embedding
             })
 
@@ -163,7 +163,7 @@ def generate_documents(df):
             "metadata": {
                 "url": row["url"],
                 "date": row["last_updated"],
-                "extracted_texts": row["extracted_texts"],
+                "text": row["text"],
                 'general_id': row['id']
             }
         }
@@ -176,8 +176,8 @@ def generate_documents(df):
 
 
 #EXAMPLE USE
-#data['extracted_texts'] = data['extracted_texts'].apply(str)
-#data['chunk'] = data['extracted_texts'].apply(chunk_text)
+#data['text'] = data['text'].apply(str)
+#data['chunk'] = data['text'].apply(chunk_text)
 #new_data = expand_dataframe_with_embeddings(data, embed_model)
 #document = generate_documents(new_data)
 #upload_csv_to_s3(BUCKET_NAME,'csv_files/embeddings/embedded_data.csv', new_data)

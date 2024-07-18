@@ -65,13 +65,13 @@ class HTMLCleaner:
             raise ValueError("JSON content must include 'html_content' and 'last_updated' fields")
 
         # Apply the extraction and cleaning function to the 'html_content' column
-        data['extracted_texts'] = data['html_content'].apply(self.extract_and_clean_text)
+        data['text'] = data['html_content'].apply(self.extract_and_clean_text)
         
         # Convert 'last_updated' to a readable date format
         data['last_updated'] = data['last_updated'].apply(self.convert_to_date)
         
         # Calculate the length of the extracted text
-        data['len'] = data['extracted_texts'].apply(len)
+        data['len'] = data['text'].apply(len)
         
         return data
     
@@ -88,13 +88,13 @@ class HTMLCleaner:
             raise ValueError("JSON content must include 'html_content' and 'last_updated' fields")
 
         # Apply the extraction and cleaning function to the 'html_content' column
-        data['extracted_texts'] = data['html_content'].apply(self.extract_and_clean_text)
+        data['text'] = data['html_content'].apply(self.extract_and_clean_text)
         
         # Convert 'last_updated' to a readable date format
         data['last_updated'] = data['last_updated'].apply(self.convert_to_date)
         
         # Calculate the length of the extracted text
-        data['len'] = data['extracted_texts'].apply(len)
+        data['len'] = data['text'].apply(len)
         
         return data
     
@@ -110,13 +110,13 @@ class HTMLCleaner:
             raise ValueError("JSON content must include 'html_content' and 'last_updated' fields")
 
         # Apply the extraction and cleaning function to the 'html_content' column
-        data['extracted_texts'] = data['html_content'].apply(self.extract_and_clean_text)
+        data['text'] = data['html_content'].apply(self.extract_and_clean_text)
         
         # Convert 'last_updated' to a readable date format
         data['last_updated'] = data['last_updated'].apply(self.convert_to_date)
         
         # Calculate the length of the extracted text
-        data['len'] = data['extracted_texts'].apply(len)
+        data['len'] = data['text'].apply(len)
         
         return data
 
