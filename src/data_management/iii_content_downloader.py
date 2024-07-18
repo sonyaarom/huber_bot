@@ -3,7 +3,7 @@ import json
 import requests
 import os
 import sys
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
 
 from downloader_s3 import download_from_s3, upload_to_s3
 

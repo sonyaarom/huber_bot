@@ -5,7 +5,7 @@ import boto3
 from urllib.parse import urlparse
 
 # Ensure the script directory is in the sys.path
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
 
 from downloader_s3 import upload_to_s3
 

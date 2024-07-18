@@ -7,7 +7,7 @@ from pathlib import Path
 from datetime import datetime
 import sys
 import json
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
 
 from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3
 

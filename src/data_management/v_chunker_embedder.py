@@ -1,10 +1,13 @@
-from llama_index.embeddings.huggingface import HuggingFaceEmbedding
+from langchain_community.embeddings import HuggingFaceEmbeddings
+
 import pandas as pd
 import sys
 import os
 from io import StringIO
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../scripts')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
+
+
 from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3, download_csv_from_s3
 
 
@@ -17,7 +20,7 @@ S3_KEY = 'csv_files/cleaned/data.csv'
 
 data = download_csv_from_s3(BUCKET_NAME, S3_KEY)
 
-embed_model = HuggingFaceEmbedding()
+embed_model = HuggingFaceEmbeddings()
 
 def chunk_text(text, max_length=500, overlap=100, separators=None):
     """
@@ -91,7 +94,8 @@ def expand_dataframe_with_embeddings(data, embed_model):
     # Iterate over the DataFrame
     for _, row in data.iterrows():
         for chunk in row['chunk']:
-            embedding = embed_model.get_text_embedding(chunk)
+            #embedding = embed_model.get_text_embedding(chunk)
+            embedding = embed_model.embed_documents(chunk)
             new_rows.append({
                 'id': row['id'],
                 'url': row['url'],
@@ -106,7 +110,7 @@ def expand_dataframe_with_embeddings(data, embed_model):
     # Create a new DataFrame from the new rows
     expanded_df = pd.DataFrame(new_rows)
 
-    expanded_df = expanded_df[~expanded_df['embedding'].apply(lambda x: any(pd.isna(v) for v in x))]
+    #expanded_df = expanded_df[~expanded_df['embedding'].apply(lambda x: any(pd.isna(v) for v in x))]
     return expanded_df
 
 
