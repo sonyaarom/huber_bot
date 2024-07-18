@@ -148,7 +148,7 @@ def generate_documents(df):
     df['url_count'] = df.groupby('url').cumcount() + 1
 
     # Generate unique identifier by combining URL and count
-    df['unique_id'] = df.apply(lambda row: f"{row['url']}_{row['url_count']}", axis=1)
+    df['unique_id'] = df.apply(lambda row: f"{row['id']}_{row['url_count']}", axis=1)
     
     # Generate documents list
     documents = []
