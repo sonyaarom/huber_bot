@@ -87,7 +87,7 @@ def unzip_local_file(file_path):
         raise
 
 
-def filter_file_content(file_content: str) -> list:
+def filter_file_content(file_content: str, pattern) -> list:
     """
     Filters the file content to extract URLs and lastmod dates using regex.
 
@@ -97,7 +97,7 @@ def filter_file_content(file_content: str) -> list:
     Returns:
     list: A list of tuples containing URLs and lastmod dates.
     """
-    pattern = r'''<loc>(https://www\.wiwi\.hu-berlin\.de/en/(?!.*\.jpeg|.*\.pdf|.*\.png|.*\.jpg).*?)(?<!/view)</loc>\s*<lastmod>([^<]+)</lastmod>'''
+    #pattern = r'''<loc>(https://www\.wiwi\.hu-berlin\.de/en/(?!.*\.jpeg|.*\.pdf|.*\.png|.*\.jpg).*?)(?<!/view)</loc>\s*<lastmod>([^<]+)</lastmod>'''
     matches = re.findall(pattern, file_content)
     return matches
 
@@ -160,25 +160,25 @@ def process_s3_files(bucket_name, xml_prefix='', json_prefix='json_files/'):
     s3.put_object(Bucket=bucket_name, Key=json_file_key, Body=json_data)
     print(f"All matches saved to {json_file_key} in bucket {bucket_name}")
 
-if __name__ == "__main__":
-    source_bucket = 'hu-chatbot-schema'
-    source_prefix = 'gz_files/'
-    dest_bucket = 'hu-chatbot-schema'  # You can change this if you want to use a different bucket
-    dest_prefix = 'xml_files/'  # Prefix for the XML files
-    
-    try:
-        # Get the latest gzip file
-        latest_file_key = get_latest_file(source_bucket, source_prefix)
-        
-        # Generate the destination key (changing extension from .gz to .xml)
-        dest_key = dest_prefix + latest_file_key.split('/')[-1].replace('.gz', '.xml')
-        
-        # Process and upload the file
-        process_and_upload_file(source_bucket, latest_file_key, dest_bucket, dest_key)
-        
-        logging.info(f"Process completed. Check S3 bucket {dest_bucket} for the file {dest_key}")
-    except Exception as e:
-        logging.error(f"An error occurred: {str(e)}")
+#if __name__ == "__main__":
+#    source_bucket = 'hu-chatbot-schema'
+#    source_prefix = 'gz_files/'
+#    dest_bucket = 'hu-chatbot-schema'  # You can change this if you want to use a different bucket
+#    dest_prefix = 'xml_files/'  # Prefix for the XML files
+#    
+#    try:
+#        # Get the latest gzip file
+#        latest_file_key = get_latest_file(source_bucket, source_prefix)
+#        
+#        # Generate the destination key (changing extension from .gz to .xml)
+#        dest_key = dest_prefix + latest_file_key.split('/')[-1].replace('.gz', '.xml')
+#        
+#        # Process and upload the file
+#        process_and_upload_file(source_bucket, latest_file_key, dest_bucket, dest_key)
+#        
+#        logging.info(f"Process completed. Check S3 bucket {dest_bucket} for the file {dest_key}")
+#   except Exception as e:
+#        logging.error(f"An error occurred: {str(e)}")
 
 #if __name__ == "__main__":
 #    bucket_name = 'hu-chatbot-schema'

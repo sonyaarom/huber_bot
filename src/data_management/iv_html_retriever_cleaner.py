@@ -16,8 +16,9 @@ from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3
 
 
 class HTMLCleaner:
-    def __init__(self, json_content):
+    def __init__(self, json_content, dict_content):
         self.json_content = json_content
+        self.dict_content = dict_content
 
     def extract_and_clean_text(self, html_content) -> str:
         """
@@ -51,11 +52,56 @@ class HTMLCleaner:
         datetime_obj = datetime.strptime(datetime_string, "%Y-%m-%dT%H:%M:%S%z")
         return datetime_obj.strftime("%Y-%m-%d")
 
-    def process_data(self):
+    def process_data_from_json(self):
         # Convert the JSON content into a DataFrame
 
         data_dict = json.loads(self.json_content)
         data = pd.DataFrame(data_dict).transpose()
+        data.index.name = "id"
+        data.reset_index(inplace=True)
+
+        # Ensure the 'html_content' and 'last_updated' columns exist
+        if 'html_content' not in data.columns or 'last_updated' not in data.columns:
+            raise ValueError("JSON content must include 'html_content' and 'last_updated' fields")
+
+        # Apply the extraction and cleaning function to the 'html_content' column
+        data['extracted_texts'] = data['html_content'].apply(self.extract_and_clean_text)
+        
+        # Convert 'last_updated' to a readable date format
+        data['last_updated'] = data['last_updated'].apply(self.convert_to_date)
+        
+        # Calculate the length of the extracted text
+        data['len'] = data['extracted_texts'].apply(len)
+        
+        return data
+    
+    def process_data_from_json(self):
+        # Convert the JSON content into a DataFrame
+
+        data_dict = json.loads(self.json_content)
+        data = pd.DataFrame(data_dict).transpose()
+        data.index.name = "id"
+        data.reset_index(inplace=True)
+
+        # Ensure the 'html_content' and 'last_updated' columns exist
+        if 'html_content' not in data.columns or 'last_updated' not in data.columns:
+            raise ValueError("JSON content must include 'html_content' and 'last_updated' fields")
+
+        # Apply the extraction and cleaning function to the 'html_content' column
+        data['extracted_texts'] = data['html_content'].apply(self.extract_and_clean_text)
+        
+        # Convert 'last_updated' to a readable date format
+        data['last_updated'] = data['last_updated'].apply(self.convert_to_date)
+        
+        # Calculate the length of the extracted text
+        data['len'] = data['extracted_texts'].apply(len)
+        
+        return data
+    
+    def process_data_from_dict(self):
+        # Convert the JSON content into a DataFrame
+
+        data = pd.DataFrame(self.dict_content).transpose()
         data.index.name = "id"
         data.reset_index(inplace=True)
 

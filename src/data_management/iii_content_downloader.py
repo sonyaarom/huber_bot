@@ -67,6 +67,56 @@ class S3JSONConverter:
         # Upload the updated JSON file back to S3
         self.upload_json(updated_data)
 
+class JSONConverter:
+    def __init__(self, input_file):
+        self.input_file = input_file
+
+    def read_json(self):
+        with open(self.input_file, 'r', encoding='utf-8') as file:
+            return json.load(file)
+
+    def get_html_content(self, url):
+        try:
+            response = requests.get(url)
+            html_content = response.text
+            return html_content
+        except:
+            return None
+        
+        
+#TODO: create matches and add html content should be together in one file
+    def add_html_content_to_dict(self, matches_dict: dict) -> dict:
+        """
+        Adds HTML content for each URL in the existing dictionary.
+
+        Args:
+            matches_dict (dict): Existing dictionary with URLs as keys.
+
+        Returns:
+            dict: Updated dictionary with HTML content added.
+        """
+        updated_dict = {}
+        for url_hash, data in matches_dict.items():
+            url = data['url']
+            date = data['last_updated']
+            html_content = self.get_html_content(url)
+            updated_dict[url_hash] = {
+                'url': url,
+                'last_updated': date,
+                'html_content': html_content
+            }
+        return updated_dict
+    
+    def process_json_file(self):
+        # Download the JSON file from S3
+        data = self.read_json()
+        
+        # Add HTML content to the dictionary
+        updated_data = self.add_html_content_to_dict(data)
+        
+        # Upload the updated JSON file back to S3
+        self.upload_json(updated_data)
+
 # Usage example
 #if __name__ == "__main__":
 #    bucket_name = 'hu-chatbot-schema'
