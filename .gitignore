@@ -1,3 +1,12 @@
 .DS_Store
 gz_files/
 .env
+__pycache__
+__pycache__/
+scripts/__pycache__/downloader_s3.cpython-39.pyc
+scripts/__pycache__
+*.pyc
+*.pyo
+__pycache__/
+*.py[cod]
+models/
