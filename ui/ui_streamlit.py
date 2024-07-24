@@ -6,6 +6,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../scripts')))
 sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../src')))
 sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../models')))
 sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../img')))
+
 import streamlit as st
 
 from model_management.model import Model
@@ -13,6 +14,7 @@ from pathlib import Path
 import time
 import numpy as np
 import dotenv
+
 
 
 MODEL_WEIGHTS_FILENAME = "mistral-7b-instruct-v0.1.Q3_K_M.gguf"
