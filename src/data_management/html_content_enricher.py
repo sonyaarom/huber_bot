@@ -7,6 +7,11 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../.
 
 from downloader_s3 import download_from_s3, upload_to_s3
 
+import logging
+
+# Set up logging at the beginning of the script
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 class ContentEnricher:
     """
     A class to enrich dictionaries with HTML content from URLs and handle JSON files locally or on S3.
@@ -27,7 +32,7 @@ class ContentEnricher:
         self.json_key = json_key
         self.updated_json_key = updated_json_key
         self.s3 = boto3.client('s3') if bucket_name else None
-
+        
     def download_json_from_s3(self):
         """
         Download a JSON file from an S3 bucket.
@@ -113,22 +118,51 @@ class ContentEnricher:
     def process_json(self):
         """
         Process the JSON file, enriching it with HTML content for each URL, and save it back.
+        
+        Returns:
+            dict: The enriched dictionary
         """
+        logging.info("Starting JSON processing")
+        
         if self.s3:
+            logging.info("Downloading JSON from S3")
             data = self.download_json_from_s3()
         else:
+            logging.info("Reading local JSON file")
             data = self.read_local_json()
 
+        logging.info("Enriching dictionary with HTML content")
         updated_data = self.add_html_content_to_dict(data)
 
-        if self.s3:
-            self.upload_json_to_s3(updated_data)
-        else:
-            self.save_local_json(updated_data)
+        # Use the new method to save to both S3 and local
+        local_save_path = self.input_source or "enriched_data.json"
+        self.save_enriched_dictionary(updated_data, local_save_path)
+        
+        logging.info("JSON processing completed")
+        return updated_data
 
-    def enrich_dictionary(self, data_dict: dict) -> dict:
+    def save_enriched_dictionary(self, data: dict, local_path: str) -> None:
         """
-        Enrich a given dictionary by adding HTML content for each URL.
+        Save the enriched dictionary to both S3 (if configured) and local storage.
+
+        Args:
+            data (dict): The enriched dictionary to save.
+            local_path (str): The local file path to save the JSON data.
+        """
+        # Save to S3 if configured
+        if self.s3 and self.bucket_name and self.updated_json_key:
+            logging.info(f"Uploading enriched JSON to S3: {self.bucket_name}/{self.updated_json_key}")
+            self.upload_json_to_s3(data)
+        
+        # Save locally
+        logging.info(f"Saving enriched JSON locally to {local_path}")
+        with open(local_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=2)
+        logging.info(f"Enriched dictionary saved locally to {local_path}")
+
+    def add_html_content_to_dict(self, data_dict: dict) -> dict:
+        """
+        Add HTML content for each URL in the existing dictionary.
 
         Args:
             data_dict (dict): Existing dictionary with URLs as keys.
@@ -136,7 +170,75 @@ class ContentEnricher:
         Returns:
             dict: Updated dictionary with HTML content added.
         """
-        return self.add_html_content_to_dict(data_dict)
+        updated_dict = {}
+        total_urls = len(data_dict)
+        for i, (url_hash, data) in enumerate(data_dict.items(), 1):
+            url = data['url']
+            date = data['last_updated']
+            logging.info(f"Processing URL {i}/{total_urls}: {url}")
+            html_content = self.get_html_content(url)
+            updated_dict[url_hash] = {
+                'url': url,
+                'last_updated': date,
+                'html_content': html_content
+            }
+        return updated_dict
+    
+    def save_enriched_dictionary(self, data: dict, local_path: str) -> None:
+        """
+        Save the enriched dictionary to both S3 (if configured) and local storage.
+
+        Args:
+            data (dict): The enriched dictionary to save.
+            local_path (str): The local file path to save the JSON data.
+        """
+        # Save to S3 if configured
+        if self.s3 and self.bucket_name and self.updated_json_key:
+            logging.info(f"Uploading enriched JSON to S3: {self.bucket_name}/{self.updated_json_key}")
+            self.upload_json_to_s3(data)
+        
+        # Save locally
+        logging.info(f"Saving enriched JSON locally to {local_path}")
+        os.makedirs(os.path.dirname(local_path), exist_ok=True)  # Ensure the directory exists
+        with open(local_path, 'w', encoding='utf-8') as file:
+            json.dump(data, file, indent=2)
+        logging.info(f"Enriched dictionary saved locally to {local_path}")
+
+    def upload_json_to_s3(self, data):
+        """
+        Upload a JSON file to an S3 bucket.
+
+        Args:
+            data (dict): JSON data to upload.
+        """
+        json_data = json.dumps(data, indent=2)
+        self.s3.put_object(Bucket=self.bucket_name, Key=self.updated_json_key, Body=json_data)
+        logging.info(f"Updated JSON uploaded to S3: {self.bucket_name}/{self.updated_json_key}")
+
+    
+if __name__ == "__main__":
+    # S3 configuration
+    bucket_name = 'hu-chatbot-schema'
+    json_key = 'json_files/all_matches.json'
+    updated_json_key = 'json_files/updated_all_matches.json'
+    
+    # Local configuration
+    local_input_path = 'assets/json_files/all_matches.json'
+    local_output_path = 'assets/json_files/enriched_all_matches.json'
+    
+    logging.info("Initializing ContentEnricher")
+    processor = ContentEnricher(input_source=local_input_path, 
+                                bucket_name=bucket_name, 
+                                json_key=json_key, 
+                                updated_json_key=updated_json_key)
+    
+    enriched_dict = processor.process_json()
+    
+    # Save the enriched dictionary locally and to S3
+    processor.save_enriched_dictionary(enriched_dict, local_output_path)
+    
+    logging.info("Processing completed. Enriched dictionary is available.")
+    logging.info(f"Total number of processed items: {len(enriched_dict)}")
 
 # Usage example
 # if __name__ == "__main__":
@@ -152,10 +254,6 @@ class ContentEnricher:
 #     processor_local = ContentEnricher(input_source=local_file_path)
 #     processor_local.process_json()
 
-#     # For enriching a separate dictionary
-#     separate_dict = {
-#         '1': {'url': 'http://example.com', 'last_updated': '2024-07-18'},
-#         '2': {'url': 'http://example.org', 'last_updated': '2024-07-19'}
-#     }
+
 #     enriched_dict = ContentEnricher().enrich_dictionary(separate_dict)
 #     print(enriched_dict)

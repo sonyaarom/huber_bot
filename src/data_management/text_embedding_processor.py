@@ -4,10 +4,11 @@ import pandas as pd
 import sys
 import os
 from io import StringIO
+import logging
+import tqdm
+from typing import Any
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
-
-
 from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3, download_csv_from_s3
 
 
@@ -76,42 +77,26 @@ def chunk_text(text, max_length=450, overlap=100, separators=None):
     return chunks  # Return the list of chunks
 
 
-
-def expand_dataframe_with_embeddings(data, embed_model):
-    """
-    Expands the DataFrame by creating new rows for each chunk and embedding.
-    Removes broken embeddings, e.g. when the english version of the website had German text.
-    
-    Args:
-        data (pd.DataFrame): The input DataFrame with a 'chunk' column containing lists of text chunks.
-        embed_model: The embedding model to generate embeddings for the text chunks.
-    
-    Returns:
-        pd.DataFrame: A new DataFrame with each chunk and its embedding as separate rows.
-    """
+def expand_dataframe_with_embeddings(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     new_rows = []
-
-    # Iterate over the DataFrame
-    for _, row in data.iterrows():
-        for chunk in row['chunk']:
-            # Ensure chunk is treated as a string, not as a list
-            chunk_str = chunk if isinstance(chunk, str) else ' '.join(chunk)
-            embedding = embed_model.embed_documents([chunk_str])
-            new_rows.append({
-                'id': row['id'],
-                'url': row['url'],
-                'last_updated': row['last_updated'],
-                'html_content': row['html_content'],
-                'text': chunk_str,  # Ensure text is stored as a string
-                'len': len(chunk_str),
-                'embedding': embedding
-            })
-
-    # Create a new DataFrame from the new rows
-    expanded_df = pd.DataFrame(new_rows)
-
-    #expanded_df = expanded_df[~expanded_df['embedding'].apply(lambda x: any(pd.isna(v) for v in x))]
-    return expanded_df
+    for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing rows"):
+        try:
+            for chunk in row['chunk']:
+                chunk_str = chunk if isinstance(chunk, str) else ' '.join(chunk)
+                embedding = embed_model.embed_documents([chunk_str])
+                new_rows.append({
+                    'id': row['id'],
+                    'url': row['url'],
+                    'last_updated': row['last_updated'],
+                    'html_content': row['html_content'],
+                    'text': chunk_str,
+                    'len': len(chunk_str),
+                    'embedding': embedding
+                })
+        except Exception as e:
+            logging.error(f"Error processing row {row['id']}: {str(e)}")
+    
+    return pd.DataFrame(new_rows)
 
 
 def generate_documents(df):
@@ -174,10 +159,19 @@ def generate_documents(df):
 
 
 
+# if __name__ == "__main__":
+#     try:
+#         data = download_csv_from_s3(BUCKET_NAME, S3_KEY)
+#         logging.info(f"Successfully downloaded data from S3: {BUCKET_NAME}/{S3_KEY}")
 
-#EXAMPLE USE
-#data['text'] = data['text'].apply(str)
-#data['chunk'] = data['text'].apply(chunk_text)
-#new_data = expand_dataframe_with_embeddings(data, embed_model)
-#document = generate_documents(new_data)
-#upload_csv_to_s3(BUCKET_NAME,'csv_files/embeddings/embedded_data.csv', new_data)
+#         embed_model = HuggingFaceEmbeddings()
+        
+#         data['text'] = data['text'].apply(str)
+#         data['chunk'] = data['text'].apply(chunk_text)
+#         new_data = expand_dataframe_with_embeddings(data, embed_model)
+#         documents = generate_documents(new_data)
+        
+#         upload_csv_to_s3(BUCKET_NAME, 'csv_files/embeddings/embedded_data.csv', new_data)
+#         logging.info("Successfully uploaded embedded data to S3")
+#     except Exception as e:
+#         logging.error(f"An error occurred: {str(e)}")

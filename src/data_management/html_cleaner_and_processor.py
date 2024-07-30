@@ -124,17 +124,29 @@ class HTMLCleaner:
 
 
 
-#if __name__ == "__main__":
-#
-#    BUCKET_NAME = 'hu-chatbot-schema'
-#    JSON_KEY = 'json_files/updated_all_matches.json'
-#    JSON_KEY_UPLOAD = 'csv_files/cleaned/data.csv' 
-#
-#
-#   export = download_from_s3(BUCKET_NAME, JSON_KEY)
-#    json_content = export['Body'].read().decode('utf-8')
-#
-#    cleaner = HTMLCleaner(json_content)
-#    processed_data = cleaner.process_data()
-#
-#    upload_csv_to_s3(BUCKET_NAME, JSON_KEY_UPLOAD, processed_data)   
+# if __name__ == "__main__":
+#     BUCKET_NAME = 'hu-chatbot-schema'
+#     JSON_KEY = 'json_files/updated_all_matches.json'
+#     JSON_KEY_UPLOAD = 'csv_files/cleaned/data.csv' 
+#     LOCAL_SAVE_PATH = 'assets/local_data/cleaned_data.csv'  # Define the local save path
+
+#     # Ensure the local directory exists
+#     os.makedirs(os.path.dirname(LOCAL_SAVE_PATH), exist_ok=True)
+
+#     export = download_from_s3(BUCKET_NAME, JSON_KEY)
+#     json_content = export['Body'].read().decode('utf-8')
+
+#     cleaner = HTMLCleaner(json_content, None)  # Assuming we're using json_content here
+#     processed_data = cleaner.process_data_from_json()
+
+#     # Save to S3
+#     #upload_csv_to_s3(BUCKET_NAME, JSON_KEY_UPLOAD, processed_data)   
+
+#     # Save to local directory
+#     processed_data.to_csv(LOCAL_SAVE_PATH, index=False)
+#     print(f"Data saved locally to: {LOCAL_SAVE_PATH}")
+
+#     # Optionally, you can add logging here
+#     print(f"Processed {len(processed_data)} rows of data")
+#     print(f"Data uploaded to S3: {BUCKET_NAME}/{JSON_KEY_UPLOAD}")
+#     print(f"Data saved locally to: {LOCAL_SAVE_PATH}")
