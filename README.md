@@ -82,7 +82,7 @@ I would like to thank my advisors, colleagues, and the WiWi faculty of HU Berlin
 
 ---
 
-For any questions or inquiries, please contact [your-email@example.com].
+For any questions or inquiries, please contact [sonyaarom@gmail.com].
 
 Thank you for your interest in this project!
 
