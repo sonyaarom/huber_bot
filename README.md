@@ -89,3 +89,8 @@ Thank you for your interest in this project!
 ---
 
 *This README was generated as part of the final project for the Master program.*
+* 1. multi_destination_file_handler
+* 2. xml_sitemap_processor
+* 3. html_content_enricher
+* 4. html_cleaner_and_processer
+* 5. text_embedding_processor
