@@ -5,8 +5,11 @@ import sys
 import os
 from io import StringIO
 import logging
-import tqdm
+
 from typing import Any
+import tqdm
+from tqdm import tqdm
+
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../../scripts')))
 from downloader_s3 import upload_to_s3, download_from_s3,upload_csv_to_s3, download_csv_from_s3
@@ -76,7 +79,6 @@ def chunk_text(text, max_length=450, overlap=100, separators=None):
     
     return chunks  # Return the list of chunks
 
-
 def expand_dataframe_with_embeddings(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     new_rows = []
     for _, row in tqdm(data.iterrows(), total=len(data), desc="Processing rows"):
@@ -97,7 +99,6 @@ def expand_dataframe_with_embeddings(data: pd.DataFrame, embed_model: Any) -> pd
             logging.error(f"Error processing row {row['id']}: {str(e)}")
     
     return pd.DataFrame(new_rows)
-
 
 def generate_documents(df):
     """
