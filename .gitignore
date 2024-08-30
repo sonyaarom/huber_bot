@@ -11,15 +11,13 @@ __pycache__/
 __pycache__
 *.py[cod]
 models/
-<<<<<<< HEAD
 .python-version
 assets/
 huber/
 huber
 bin/
 TODO.md
-=======
 ../.python-version
+mlruns/
 huber/
 .python-version
->>>>>>> main

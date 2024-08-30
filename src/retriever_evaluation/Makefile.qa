@@ -1,0 +1,53 @@
+# Makefile for QA Generator and Evaluator
+
+# Python interpreter
+PYTHON := python3
+
+# Script name
+SCRIPT := qa_generator_evaluator.py
+
+# Default input and output files
+INPUT_FILE := ../../assets/csv/data_full.csv
+OUTPUT_FILE := ../../assets/csv/evaluated_questions_with_scores_to_delete.csv
+
+# Default number of questions to generate
+MAX_QUESTIONS := 1
+
+# Default sample size (0 means no sampling)
+SAMPLE_SIZE := 1
+
+.PHONY: run run-sample setup clean
+
+# Default target: run the script without sampling
+run:
+	$(PYTHON) $(SCRIPT) --input $(INPUT_FILE) --output $(OUTPUT_FILE) --max_questions $(MAX_QUESTIONS)
+
+# Run the script with sampling
+run-sample:
+	$(PYTHON) $(SCRIPT) --input $(INPUT_FILE) --output $(OUTPUT_FILE) --max_questions $(MAX_QUESTIONS) --sample $(SAMPLE_SIZE)
+
+# Set up the Python environment
+setup:
+	pip install -r requirements.txt
+
+# Clean up generated files
+clean:
+	rm -f $(OUTPUT_FILE)
+
+# Help target
+help:
+	@echo "Available targets:"
+	@echo "  run              : Run the script without sampling"
+	@echo "  run-sample       : Run the script with sampling"
+	@echo "  setup            : Set up the Python environment"
+	@echo "  clean            : Remove generated output files"
+	@echo ""
+	@echo "Variables:"
+	@echo "  INPUT_FILE       : Input CSV file (default: $(INPUT_FILE))"
+	@echo "  OUTPUT_FILE      : Output CSV file (default: $(OUTPUT_FILE))"
+	@echo "  MAX_QUESTIONS    : Maximum number of questions to generate (default: $(MAX_QUESTIONS))"
+	@echo "  SAMPLE_SIZE      : Number of rows to sample (default: $(SAMPLE_SIZE), 0 means no sampling)"
+	@echo ""
+	@echo "Example usage:"
+	@echo "  make run INPUT_FILE=my_data.csv OUTPUT_FILE=my_results.csv MAX_QUESTIONS=10"
+	@echo "  make run-sample SAMPLE_SIZE=100 MAX_QUESTIONS=20"
