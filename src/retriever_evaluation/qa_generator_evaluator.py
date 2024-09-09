@@ -18,6 +18,7 @@ from langchain_core.callbacks import CallbackManager, StreamingStdOutCallbackHan
 from langchain_core.prompts import PromptTemplate
 from langchain_community.embeddings import HuggingFaceEmbeddings
 
+
 cwd = os.getcwd()
 sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../assets')))
 sys.path.insert(0, os.path.abspath(os.path.join(cwd, '../src')))
