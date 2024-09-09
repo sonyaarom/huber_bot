@@ -9,10 +9,18 @@
 6. How to update Pinecone?
 --------
 
-7. How to improve retriever? 
+7. How to improve retriever?:
+    7.1. Retriever sentence based
+    7.2. Retriever token based
+    7.3. Semantic Retriever
+Named Entity Recognition
+
 8. How to store data better? Meta tags? Entity detection?
 
-
+#semantic based, token based and sentence based
+#NER
+#embedding models
+#
 
 
 --------
