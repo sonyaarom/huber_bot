@@ -109,6 +109,25 @@ def create_pinecone_index(pc: Pinecone, index_name: str, dimension: int, cloud: 
             return None, False
         
 
+def get_embeddings(embed_model: Any, texts: List[str]) -> List[List[float]]:
+    """
+    A wrapper function to get embeddings from different types of models.
+
+    Args:
+        embed_model (Any): The embedding model (either HuggingFaceEmbeddings or a model with encode_documents method).
+        texts (List[str]): A list of texts to embed.
+
+    Returns:
+        List[List[float]]: A list of embeddings.
+    """
+    if hasattr(embed_model, 'embed_documents'):
+        return embed_model.embed_documents(texts)
+    elif hasattr(embed_model, 'encode'):
+        return embed_model.encode(texts)
+    else:
+        raise AttributeError("The provided model doesn't have 'embed_documents' or 'encode' method.")
+
+# Update the embed_dataframe function to use the new wrapper
 def embed_dataframe(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     """
     Generates embeddings for the text content of each row in the input DataFrame.
@@ -116,7 +135,7 @@ def embed_dataframe(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     Args:
         data (pd.DataFrame): Input DataFrame containing at least a 'text' column and a
                              'unique_id' column for error reporting.
-        embed_model (Any): An embedding model object that has an 'embed_documents' method.
+        embed_model (Any): An embedding model object that has either 'embed_documents' or 'encode' method.
 
     Returns:
         pd.DataFrame: A new DataFrame with an additional 'embedding' column containing
@@ -125,7 +144,7 @@ def embed_dataframe(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     embeddings = []
     for _, row in tqdm(data.iterrows(), total=len(data), desc="Embedding texts"):
         try:
-            embedding = embed_model.embed_documents([row['text']])[0]
+            embedding = get_embeddings(embed_model, [row['text']])[0]
             embeddings.append(embedding)
         except Exception as e:
             logging.error(f"Error embedding row {row['unique_id']}: {str(e)}")
@@ -135,7 +154,6 @@ def embed_dataframe(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     result_df = data.dropna(subset=['embedding'])
     logger.info(f"Finished embedding. {len(result_df)} rows successfully embedded")
     return result_df
-
 
 from typing import List, Dict, Any
 
@@ -188,9 +206,11 @@ def generate_documents(df: pd.DataFrame, chunk_size: int, doc_type: str) -> List
 
 
 
+import numpy as np
+
 def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, doc_type: str, base_path: str) -> None:
     """
-    Saves a list of document dictionaries to a JSON file.
+    Saves a list of document dictionaries to a JSON file, converting NumPy arrays to lists.
 
     Args:
         docs (List[dict]): A list of document dictionaries to be saved.
@@ -198,14 +218,26 @@ def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, d
         model_name (str): The name of the model used for processing.
         doc_type (str): The type of document ('sentence', 'token', or 'semantic_texttiling').
         base_path (str): The base path where to save the JSON file.
-        embed_model_name (str): The name of the embedding model used.
     """
     filename = f"{doc_type}-vectors-{chunk_size}chunksize-{model_name}.json"
     filepath = os.path.join(base_path, filename)
     logger.info(f"Saving {len(docs)} documents to {filepath}")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
+
+    def numpy_to_list(obj):
+        if isinstance(obj, np.ndarray):
+            return obj.tolist()
+        elif isinstance(obj, dict):
+            return {k: numpy_to_list(v) for k, v in obj.items()}
+        elif isinstance(obj, list):
+            return [numpy_to_list(item) for item in obj]
+        return obj
+
+    # Convert NumPy arrays to lists
+    docs_converted = numpy_to_list(docs)
+
     with open(filepath, 'w') as f:
-        json.dump(docs, f)
+        json.dump(docs_converted, f)
     logger.info(f"Documents successfully saved to {filepath}")
 
 

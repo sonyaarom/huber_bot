@@ -3,6 +3,7 @@ import sys
 import pandas as pd
 import logging
 from dotenv import load_dotenv
+from sentence_transformers import SentenceTransformer
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from typing import List, Tuple
 
@@ -37,13 +38,17 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
         logger.info(f"    Mean length = {mean_length:.2f}")
         logger.info(f"    Median length = {median_length:.2f}")
 
-def main(chunk_types: List[str] = ["recursive"]):
+from shared_utils import get_embeddings, embed_dataframe
+#options for encode model = "all-MiniLM-L6-v2" or "hf"
+def main(chunk_types: List[str] = ["recursive", "sentence", "char", "token", "semantic"], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
         load_dotenv()
         
         df_path = os.path.join(assets_dir, 'csv', 'data_subset.csv')
-        chunk_sizes = [1024]  # You can adjust this as needed
-        embed_model_name = "hf"
+        chunk_sizes = [128, 256, 512]  # You can adjust this as needed
+        if embed_model_name == None:
+            embed_model_name = embed_model
+
         docs_path = os.path.join(assets_dir, 'docs')
         
         if not os.path.exists(df_path):
@@ -60,33 +65,38 @@ def main(chunk_types: List[str] = ["recursive"]):
         logger.info(f"Dropped {rows_dropped} rows with NA values in the 'text' column")
         logger.info(f"Proceeding with {len(df)} rows for chunking")
 
-        logger.info("Initializing HuggingFaceEmbeddings model")
-        embed_model = HuggingFaceEmbeddings()
+        if encode_model == "hf":
+            logger.info("Initializing HuggingFaceEmbeddings model")
+            embed_model = HuggingFaceEmbeddings()
+        else:
+            logger.info(f"Initializing SentenceTransformer model: {encode_model}")
+            embed_model = SentenceTransformer(f'sentence-transformers/{encode_model}')
         
-        if "sentence" in chunk_types:
-            logger.info("Processing sentence-based chunks")
-            sentence_stats = process_data_sentences(df, chunk_sizes, embed_model, embed_model_name, docs_path)
-            log_chunk_stats("Sentence-based", sentence_stats)
+        # Embed the dataframe
+        df_embedded = embed_dataframe(df, embed_model)
         
-        if "char" in chunk_types:
-            logger.info("Processing character-based chunks")
-            char_stats = process_data_tokens(df, chunk_sizes, embed_model, embed_model_name, docs_path)
-            log_chunk_stats("Character-based", char_stats)
-        
-        if "semantic" in chunk_types:
-            logger.info("Processing semantic chunks using TextTiling")
-            semantic_stats = process_data_semantic(df, chunk_sizes, embed_model, embed_model_name, docs_path)
-            log_chunk_stats("Semantic (TextTiling)", semantic_stats)
-
-        if "recursive" in chunk_types:
-            logger.info("Processing recursive chunks using LangChain")
-            recursive_stats = process_data_recursive_langchain(df, chunk_sizes, embed_model, embed_model_name, docs_path)
-            log_chunk_stats("Recursive (LangChain)", recursive_stats)
-        
-        if "token" in chunk_types:
-            logger.info("Processing token-based chunks using tiktoken")
-            token_stats = process_data_tokens_tiktoken(df, chunk_sizes, embed_model, embed_model_name, docs_path)
-            log_chunk_stats("Token-based (tiktoken)", token_stats)
+        # Process chunks based on the specified types
+        for chunk_type in chunk_types:
+            if chunk_type == "sentence":
+                logger.info("Processing sentence-based chunks")
+                sentence_stats = process_data_sentences(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                log_chunk_stats("Sentence-based", sentence_stats)
+            elif chunk_type == "char":
+                logger.info("Processing character-based chunks")
+                char_stats = process_data_tokens(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                log_chunk_stats("Character-based", char_stats)
+            elif chunk_type == "semantic":
+                logger.info("Processing semantic chunks using TextTiling")
+                semantic_stats = process_data_semantic(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                log_chunk_stats("Semantic (TextTiling)", semantic_stats)
+            elif chunk_type == "recursive":
+                logger.info("Processing recursive chunks using LangChain")
+                recursive_stats = process_data_recursive_langchain(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                log_chunk_stats("Recursive (LangChain)", recursive_stats)
+            elif chunk_type == "token":
+                logger.info("Processing token-based chunks using tiktoken")
+                token_stats = process_data_tokens_tiktoken(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                log_chunk_stats("Token-based (tiktoken)", token_stats)
         
         logger.info("Chunk creation process completed successfully")
     except Exception as e:
