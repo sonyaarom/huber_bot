@@ -153,9 +153,17 @@ def generate_documents(df: pd.DataFrame, chunk_size: int, doc_type: str) -> List
     """
     documents = []
     for _, row in df.iterrows():
+        # Debugging: Print row contents
+        #print(f"Processing row: {row}")
+        
         # Use get() method with a default value to avoid KeyError
-        unique_id = row.get('unique_id', row.get('general_id', str(uuid.uuid4())))
-        general_id = row.get('original_id', row.get('general_id', 'unknown'))
+        unique_id = row.get('unique_id', str(uuid.uuid4()))
+        
+        # Prioritize 'id' over 'general_id' for consistency
+        general_id = row.get('id', row.get('general_id', 'unknown'))
+        
+        # Debugging: Print ID fields
+        #print(f"unique_id: {unique_id}, general_id: {general_id}")
         
         document = {
             "unique_id": unique_id,
