@@ -16,6 +16,7 @@ logging.basicConfig(level=logging.INFO,
                     ])
 logger = logging.getLogger(__name__)
 
+
 class VectorFileHandler(FileSystemEventHandler):
     def __init__(self, pinecone_client, embedding_model_name, project_name):
         self.pc = pinecone_client
@@ -26,7 +27,7 @@ class VectorFileHandler(FileSystemEventHandler):
     def on_created(self, event):
         if event.is_directory:
             return
-        if event.src_path.endswith('.json'):
+        if event.src_path.endswith('.json') and self.embedding_model_name in event.src_path:
             logger.info(f"New file detected: {event.src_path}")
             self.process_file(event.src_path)
 
@@ -67,38 +68,10 @@ class VectorFileHandler(FileSystemEventHandler):
 def process_existing_files(folder_path, handler):
     logger.info(f"Processing existing files in {folder_path}")
     for filename in os.listdir(folder_path):
-        if filename.endswith('.json'):
+        if filename.endswith('.json') and handler.embedding_model_name in filename:
             file_path = os.path.join(folder_path, filename)
             handler.process_file(file_path)
-
-def start_monitoring(folder_path, pinecone_client, embedding_model_name, project_name):
-    logger.info(f"Starting to monitor folder: {folder_path}")
-    event_handler = VectorFileHandler(pinecone_client, embedding_model_name, project_name)
-    
-    # Process existing files first
-    process_existing_files(folder_path, event_handler)
-    
-    observer = Observer()
-    observer.schedule(event_handler, folder_path, recursive=False)
-    observer.start()
-    logger.info("File system observer started")
-    
-    try:
-        while True:
-            time.sleep(10)  # Check every 10 seconds
-            if not observer.is_alive():
-                logger.error("Observer has stopped unexpectedly. Restarting...")
-                observer.start()
-            
-            # Log the contents of the monitored folder
-            logger.info(f"Current contents of {folder_path}:")
-            for filename in os.listdir(folder_path):
-                logger.info(f"  - {filename}")
-    except KeyboardInterrupt:
-        logger.info("Received keyboard interrupt, stopping observer")
-        observer.stop()
-    observer.join()
-    logger.info("File system observer stopped")
+    logger.info("Finished processing existing files")
 
 def delete_all_vectors(pinecone_client):
     logger.info("Starting deletion of all vectors from all indexes")
@@ -169,70 +142,101 @@ def delete_all_indexes(pinecone_client, interactive=True):
     
     logger.info("Finished deletion process")
 
+
 def upload_files(folder_path, pinecone_client, embedding_model_name, project_name):
     logger.info(f"Processing files in folder: {folder_path} for project: {project_name}")
     event_handler = VectorFileHandler(pinecone_client, embedding_model_name, project_name)
     
     # Process existing files
     for filename in os.listdir(folder_path):
-        if filename.endswith('.json'):
+        if filename.endswith('.json') and embedding_model_name in filename:
             file_path = os.path.join(folder_path, filename)
             logger.info(f"Processing file: {file_path}")
             event_handler.process_file(file_path)
     
     logger.info("Finished processing all files in the folder")
+import os
+import argparse
+import logging
+from pinecone_func import initialize_pinecone, create_pinecone_index, upload_to_pinecone
 
-if __name__ == "__main__":
+# Set up logging
+logging.basicConfig(level=logging.INFO, 
+                    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+                    handlers=[
+                        logging.FileHandler("pinecone_uploader.log"),
+                        logging.StreamHandler()
+                    ])
+logger = logging.getLogger(__name__)
+
+def main():
     parser = argparse.ArgumentParser(description="Pinecone Vector Upload and Delete Tool")
     parser.add_argument("--folder", type=str, help="Folder containing vector files to upload")
     parser.add_argument("--delete", choices=['interactive', 'all'], help="Delete indexes: 'interactive' for selective deletion, 'all' to delete all indexes")
     parser.add_argument("--embedding_model", type=str, required=True, help="Name of the embedding model")
     parser.add_argument("--project", type=str, default="default", help="Project name for the indexes")
+    parser.add_argument("--api_key", type=str, help="Pinecone API key")
     
     args = parser.parse_args()
     
-    api_key = os.getenv('PINECONE_API_KEY')
+    # Prioritize command-line argument, then environment variable, then default value
+    api_key = args.api_key or os.getenv('PINECONE_API_KEY')
     environment = os.getenv('PINECONE_ENVIRONMENT')
     
     if not api_key or not environment:
-        logger.error("PINECONE_API_KEY and PINECONE_ENVIRONMENT must be set")
-        raise ValueError("PINECONE_API_KEY and PINECONE_ENVIRONMENT must be set")
+        logger.error("Pinecone API key and environment must be set")
+        raise ValueError("Pinecone API key and environment must be set")
 
-    logger.info("Initializing Pinecone")
-    pc = initialize_pinecone()
-    logger.info("Pinecone initialized successfully")
-    logger.info(f"Pinecone client initialized with API key: {api_key[:5]}... and environment: {environment}")
+    try:
+        logger.info("Initializing Pinecone")
+        pc = initialize_pinecone(api_key, environment)
+        logger.info("Pinecone initialized successfully")
+        logger.info(f"Pinecone client initialized with API key: {api_key[:5]}... and environment: {environment}")
+        
+        if args.delete:
+            if args.delete == 'all':
+                logger.warning("WARNING: This operation will delete all indexes without confirmation.")
+                logger.warning("Are you sure you want to proceed? (y/n)")
+                confirmation = input().lower()
+                if confirmation == 'y':
+                    logger.info("Proceeding with deletion of all indexes.")
+                    delete_all_indexes(pc, interactive=False)
+                else:
+                    logger.info("Deletion cancelled.")
+            elif args.delete == 'interactive':
+                logger.warning("WARNING: This operation will allow you to delete indexes interactively.")
+                logger.warning("Do you want to proceed with the interactive deletion process? (y/n)")
+                confirmation = input().lower()
+                if confirmation == 'y':
+                    logger.info("Interactive deletion process confirmed. Proceeding with index review.")
+                    delete_all_indexes(pc, interactive=True)
+                else:
+                    logger.info("Interactive deletion process cancelled.")
+        elif args.folder:
+            logger.info(f"Upload option selected for folder: {args.folder}")
+            try:
+                upload_files(args.folder, pc, args.embedding_model, args.project)
+            except Exception as e:
+                logger.error(f"Error during file upload: {str(e)}")
+        else:
+            logger.warning("No valid option selected. Use --delete 'interactive' for selective index deletion, --delete 'all' to delete all indexes, or --folder to upload files from a folder.")
+            print("Use --delete 'interactive' for selective index deletion, --delete 'all' to delete all indexes, or --folder to upload files from a folder")
     
-    if args.delete:
-        if args.delete == 'all':
-            logger.warning("WARNING: This operation will delete all indexes without confirmation.")
-            logger.warning("Are you sure you want to proceed? (y/n)")
-            confirmation = input().lower()
-            if confirmation == 'y':
-                logger.info("Proceeding with deletion of all indexes.")
-                delete_all_indexes(pc, interactive=False)
-            else:
-                logger.info("Deletion cancelled.")
-        elif args.delete == 'interactive':
-            logger.warning("WARNING: This operation will allow you to delete indexes interactively.")
-            logger.warning("Do you want to proceed with the interactive deletion process? (y/n)")
-            confirmation = input().lower()
-            if confirmation == 'y':
-                logger.info("Interactive deletion process confirmed. Proceeding with index review.")
-                delete_all_indexes(pc, interactive=True)
-            else:
-                logger.info("Interactive deletion process cancelled.")
-    elif args.folder:
-        logger.info(f"Upload option selected for folder: {args.folder}")
-        upload_files(args.folder, pc, args.embedding_model, args.project)
-    else:
-        logger.warning("No valid option selected. Use --delete 'interactive' for selective index deletion, --delete 'all' to delete all indexes, or --folder to upload files from a folder.")
-        print("Use --delete 'interactive' for selective index deletion, --delete 'all' to delete all indexes, or --folder to upload files from a folder")
+    except Exception as e:
+        logger.error(f"An unexpected error occurred: {str(e)}")
+    
+    finally:
+        logger.info("Script execution completed.")
 
+if __name__ == "__main__":
+    main()
 # Example usage:
 # python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model all-mini --project chatbot_all_mini
 #python pinecone_uploader.py --delete --embedding_model hf
 #python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf
 #python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf
 
+#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf --project chatbot-all-mini
+#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model all-mini --project chatbot-all-mini
 #TODO: add functionality to define project name 
+
