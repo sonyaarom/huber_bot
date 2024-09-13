@@ -1,91 +1,78 @@
-# QA Generator and Evaluator
+# Text Processing and Embedding System
 
-This folder contains a system for generating and evaluating question-answer pairs from text data. It uses a combination of local language models and OpenAI's API to create and assess the quality of questions based on given text input.
-
-## Purpose
-
-The main goals of this project are:
-
-1. Generate relevant question-answer pairs from input text data.
-2. Evaluate the quality of generated questions based on specificity, realism, and clarity.
-3. Provide a flexible and easy-to-use interface for running the system with various configurations.
+This folder contains a system for processing large text datasets, generating embeddings, and uploading them to Pinecone for efficient retrieval and searching.
 
 ## Contents
 
-- `qa_generator_evaluator.py`: The main Python script that handles generation and evaluation of QA pairs.
-- `Makefile.qa`: A Makefile to simplify running the script with different options.
+1. `main_processor.py`: The main script for chunking text, generating embeddings, and uploading to Pinecone.
+2. `Makefile.qa`: A Makefile to simplify running the scripts with different options.
+
+## Main Features
+
+- Text chunking with configurable chunk sizes
+- Embedding generation using HuggingFaceEmbeddings
+- Local storage of processed data in JSON format
+- Upload of embeddings and metadata to Pinecone vector database
+- Flexible processing pipeline with logging and error handling
 
 ## Prerequisites
 
 - Python 3.7+
-- OpenAI API key
-- Required Python packages (ensure these are installed in your environment)
+- Pinecone API key (set as an environment variable)
+- Required Python packages (pandas, tqdm, dotenv, pinecone-client, langchain, etc.)
 
 ## Setup
 
 1. Ensure you have Python 3.7+ installed on your system.
-2. Set up your OpenAI API key as an environment variable:
+2. Install the required Python packages (consider adding a `requirements.txt` file for easy installation).
+3. Set up your Pinecone API key as an environment variable:
    ```
-   export OPENAI_API_KEY='your-api-key-here'
+   export PINECONE_API_KEY='your-api-key-here'
    ```
 
-## Using the Makefile
+## Usage
 
-The `Makefile.qa` provides several targets to run the QA generator and evaluator with different options. Here are the main commands:
+### Running the Main Processor
 
-### Run without sampling
+To run the main processing script:
 
+```
+python main_processor.py
+```
+
+This will:
+- Load data from the specified CSV file
+- Process the data with multiple chunk sizes (128, 256, 512, 1024 by default)
+- Generate embeddings for each chunk
+- Save processed data locally
+- Upload the data to Pinecone
+
+### Using the Makefile
+
+The `Makefile.qa` provides shortcuts for common tasks. To use it:
+
+```
+make -f Makefile.qa [target]
+```
+
+Available targets:
+- `run`: Run the main processing script
+- `clean`: Remove generated output files
+- `help`: Display information about available targets
+
+For example:
 ```
 make -f Makefile.qa run
 ```
 
-This will run the script using the default input file, output file, and maximum number of questions.
+## Configuration
 
-### Run with sampling
+You can modify the following parameters in the `main_processor.py` script:
 
-```
-make -f Makefile.qa run-sample SAMPLE_SIZE=100
-```
-
-This will run the script with a sample of 100 rows from the input data.
-
-### Customize input, output, and number of questions
-
-```
-make -f Makefile.qa run INPUT_FILE=custom_data.csv OUTPUT_FILE=results.csv MAX_QUESTIONS=10
-```
-
-This allows you to specify custom input and output files, as well as the maximum number of questions to generate.
-
-### Clean up
-
-```
-make -f Makefile.qa clean
-```
-
-This will remove the generated output files.
-
-### Get help
-
-```
-make -f Makefile.qa help
-```
-
-This will display information about available targets and variables.
-
-## Customizing the Run
-
-You can customize various aspects of the run by modifying the variables in the make command. For example:
-
-```
-make -f Makefile.qa run-sample SAMPLE_SIZE=50 MAX_QUESTIONS=20 INPUT_FILE=my_data.csv OUTPUT_FILE=my_results.csv
-```
-
-This will:
-- Use `my_data.csv` as the input file
-- Sample 50 rows from the input
-- Generate up to 20 questions per sampled text
-- Save the results in `my_results.csv`
+- `df_path`: Path to the input CSV file
+- `chunk_lengths`: List of chunk sizes to process
+- `embed_model_name`: Name of the embedding model to use
+- `docs_path`: Path to save/load processed documents
 
 ## Note
 

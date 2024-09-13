@@ -9,20 +9,45 @@ import time
 import wandb
 
 from langchain_community.embeddings import HuggingFaceEmbeddings
+from sentence_transformers import SentenceTransformer
 
 # Load environment variables
 load_dotenv()
 
 # Initialize HuggingFaceEmbeddings
-embed_model = HuggingFaceEmbeddings()
+#embed_ = HuggingFaceEmbeddings()
 
-def convert_question_to_vector(query):
-    try:
-        query_vector = embed_model.embed_query(query)
-        return query_vector
-    except Exception as e:
-        print(f"Error converting question to vector: {e}")
-        return None
+
+#embed_model = SentenceTransformer('all-MiniLM-L6-v2')
+embed_model = SentenceTransformer('Snowflake/snowflake-arctic-embed-l', trust_remote_code=True)
+
+
+# def convert_question_to_vector(query):
+#     try:
+#         query_vector = embed_model.embed_query(query)
+#         return query_vector
+#     except Exception as e:
+#         print(f"Error converting question to vector: {e}")
+#         return None
+    
+def convert_question_to_vector(embed_model: Any, query: List[str]) -> List[List[float]]:
+    """
+    A wrapper function to get embeddings from different types of models.
+
+    Args:
+        embed_model (Any): The embedding model (either HuggingFaceEmbeddings or a model with encode_documents method).
+        texts (List[str]): A list of texts to embed.
+
+    Returns:
+        List[List[float]]: A list of embeddings.
+    """
+    if hasattr(embed_model, 'embed_documents'):
+        return embed_model.embed_documents(query)
+    elif hasattr(embed_model, 'encode'):
+        return embed_model.encode(query)
+    else:
+        raise AttributeError("The provided model doesn't have 'embed_documents' or 'encode' method.")
+
 
 def calculate_mrr(question_id: str, general_ids: List[str]) -> Tuple[int, float]:
     if question_id in general_ids:
@@ -48,7 +73,7 @@ def evaluate_retriever(qa_df, docsearch, convert_question_to_vector, k_values=[1
 
         # Measure retrieval time
         start_time = time.time()
-        embed_question = convert_question_to_vector(question)
+        embed_question = convert_question_to_vector(embed_model, question)
         search_results = docsearch.similarity_search_by_vector_with_score(embed_question, k=max(k_values))
         end_time = time.time()
         retrieval_time = end_time - start_time
@@ -95,8 +120,8 @@ def print_comparison_and_best_sizes(all_results):
 
 def test_all_pinecone_indexes(qa_df: pd.DataFrame, convert_question_to_vector, k_values: List[int] = [1, 3, 5]) -> Dict[str, Any]:
     # Get Pinecone credentials from environment variables
-    api_key = os.getenv('PINECONE_API_KEY')
-
+    #api_key = os.getenv('PINECONE_API_KEY')
+    api_key = "84ec63c2-829b-4234-9a56-dfbaea240ffe"
     if not api_key:
         raise ValueError("Pinecone API key not found in .env file")
 

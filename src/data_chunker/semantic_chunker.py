@@ -4,12 +4,18 @@ from nltk.tokenize import sent_tokenize, word_tokenize
 from nltk.tokenize.texttiling import TextTilingTokenizer
 import nltk
 import logging
-from typing import Tuple, List, Any, Generator
-from shared_utils import embed_dataframe, generate_documents, save_documents_to_json
+from typing import Tuple, List, Any, Generator, Dict
+from shared_utils import *
+from gliner import GLiNER
+from collections import defaultdict
 
 nltk.download('punkt', quiet=True)
 
 logger = logging.getLogger(__name__)
+
+# Initialize GLiNER model
+ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
+labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
 
 def get_overlap(chunk_size: int) -> int:
     """
@@ -19,6 +25,17 @@ def get_overlap(chunk_size: int) -> int:
         return 50
     else:
         return 200
+
+def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """
+    Converts a list of entity dictionaries into a dictionary where each label has a list of entity texts.
+    """
+    label_name_dict = defaultdict(set)
+    for entity in entities:
+        text = entity['text'].strip().lower()
+        label_name_dict[entity['label']].add(text)
+    return {k: list(v) for k, v in label_name_dict.items()}
+
 
 def adaptive_semantic_chunk(text: str, min_chunk_size: int = 100, max_chunk_size: int = 500, overlap: int = 50) -> List[str]:
     """
@@ -79,6 +96,7 @@ def adaptive_semantic_chunk(text: str, min_chunk_size: int = 100, max_chunk_size
 
     return refined_segments
 
+
 def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFrame, None, None]:
     logger.info(f"Starting to chunk dataframe with chunk size: {chunk_size}")
     
@@ -100,6 +118,11 @@ def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFra
                 chunks = adaptive_semantic_chunk(row['text'], min_chunk_size=chunk_size//2, max_chunk_size=chunk_size, overlap=overlap)
                 for i, chunk in enumerate(chunks):
                     chunk_length = len(word_tokenize(chunk))
+                    
+                    # Perform Named Entity Recognition on the chunk
+                    entities = ner_model.predict_entities(chunk, labels)
+                    formatted_entities = convert_entities_to_label_name_dict(entities)
+                    
                     chunked_rows.append({
                         'unique_id': f"{row['id']}_{i+1}",
                         'url': row.get('url', ''),
@@ -107,7 +130,8 @@ def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFra
                         'html_content': row.get('html_content', ''),
                         'text': chunk,
                         'len': chunk_length,
-                        'general_id': row['id']
+                        'general_id': row['id'],
+                        'entities': formatted_entities  # Add the extracted entities
                     })
             except Exception as e:
                 logger.error(f"Error processing row {row['id']}: {str(e)}")
@@ -116,7 +140,7 @@ def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFra
         logger.info(f"Processed batch. Created {len(result)} chunks from {end-start} rows.")
         yield result
 
-def process_data_semantic(df: pd.DataFrame, chunk_sizes, embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
+def process_data_semantic(df: pd.DataFrame, chunk_sizes: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
     chunk_stats = []
     for chunk_size in chunk_sizes:
         logger.info(f"Processing semantic chunks with target size: {chunk_size}")
@@ -139,8 +163,11 @@ def process_data_semantic(df: pd.DataFrame, chunk_sizes, embed_model: Any, embed
         logger.info(f"Chunking complete. Created {len(all_chunks)} chunks.")
         logger.info(f"Chunk length statistics: Min = {min_length}, Max = {max_length}, Mean = {mean_length:.2f}, Median = {median_length:.2f}")
         
+        logger.info("Applying BM25 sparse vectorization")
+        chunked_df = apply_bm25_sparse_vectors(all_chunks, 'text')
+
         logger.info("Embedding chunked texts")
-        embedded_df = embed_dataframe(all_chunks, embed_model)
+        embedded_df = embed_dataframe(chunked_df, embed_model)
         
         logger.info("Generating document dictionaries")
         documents = generate_documents(embedded_df, chunk_size, 'semantic')
@@ -149,6 +176,6 @@ def process_data_semantic(df: pd.DataFrame, chunk_sizes, embed_model: Any, embed
         save_documents_to_json(docs=documents, chunk_size=chunk_size, doc_type='semantic', base_path=base_path, model_name=embed_model_name)
         
         chunk_stats.append((chunk_size, min_length, max_length, mean_length, median_length))
-    
-    return chunk_stats
 
+        
+    return chunk_stats

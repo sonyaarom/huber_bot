@@ -5,10 +5,11 @@ import logging
 from dotenv import load_dotenv
 from sentence_transformers import SentenceTransformer
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from typing import List, Tuple
 
+from typing import List, Tuple
+import numpy as np
 # Update imports
-from sentence_chunker import process_data_sentences
+#from sentence_chunker import process_data_sentences
 from character_chunker import process_data_tokens
 from semantic_chunker import *
 from shared_utils import save_documents_to_json
@@ -39,13 +40,13 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
         logger.info(f"    Median length = {median_length:.2f}")
 
 from shared_utils import get_embeddings, embed_dataframe
-#options for encode model = "all-MiniLM-L6-v2" or "hf"
-def main(chunk_types: List[str] = ["recursive", "sentence", "char", "token", "semantic"], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
+#options for encode model = "all-MiniLM-L6-v2" or "hf", 'Snowflake/snowflake-arctic-embed-l' 
+def main(chunk_types: List[str] = ['char', 'token', 'semantic', 'recursive'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
         load_dotenv()
         
         df_path = os.path.join(assets_dir, 'csv', 'data_subset.csv')
-        chunk_sizes = [128, 256, 512]  # You can adjust this as needed
+        chunk_sizes = [128, 256, 512, 1024] 
         if embed_model_name == None:
             embed_model_name = embed_model
 
@@ -57,7 +58,7 @@ def main(chunk_types: List[str] = ["recursive", "sentence", "char", "token", "se
 
         logger.info(f"Loading DataFrame from {df_path}")
         df = pd.read_csv(df_path)
-        
+        logger.info(f"DataFrame loaded with {len(df)} rows")
         # Drop rows with NA values in the 'text' column
         initial_row_count = len(df)
         df = df.dropna(subset=['text'])
@@ -65,23 +66,33 @@ def main(chunk_types: List[str] = ["recursive", "sentence", "char", "token", "se
         logger.info(f"Dropped {rows_dropped} rows with NA values in the 'text' column")
         logger.info(f"Proceeding with {len(df)} rows for chunking")
 
+        if embed_model_name == None:
+            embed_model_name = encode_model
+
+        # Model extraction logic
         if encode_model == "hf":
             logger.info("Initializing HuggingFaceEmbeddings model")
             embed_model = HuggingFaceEmbeddings()
-        else:
+        elif '/' in encode_model:
             logger.info(f"Initializing SentenceTransformer model: {encode_model}")
+            embed_model = SentenceTransformer(encode_model, trust_remote_code=True)
+        elif encode_model.startswith('sentence-transformers/'):
+            logger.info(f"Initializing SentenceTransformer model: {encode_model}")
+            embed_model = SentenceTransformer(encode_model)
+        else:
+            logger.info(f"Initializing SentenceTransformer model: sentence-transformers/{encode_model}")
             embed_model = SentenceTransformer(f'sentence-transformers/{encode_model}')
-        
+            
         # Embed the dataframe
         df_embedded = embed_dataframe(df, embed_model)
         
         # Process chunks based on the specified types
         for chunk_type in chunk_types:
-            if chunk_type == "sentence":
-                logger.info("Processing sentence-based chunks")
-                sentence_stats = process_data_sentences(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
-                log_chunk_stats("Sentence-based", sentence_stats)
-            elif chunk_type == "char":
+            # if chunk_type == "sentence":
+            #     logger.info("Processing sentence-based chunks")
+            #     sentence_stats = process_data_sentences(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+            #     log_chunk_stats("Sentence-based", sentence_stats)
+            if chunk_type == "char":
                 logger.info("Processing character-based chunks")
                 char_stats = process_data_tokens(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
                 log_chunk_stats("Character-based", char_stats)

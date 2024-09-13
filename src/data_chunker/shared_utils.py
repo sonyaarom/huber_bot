@@ -12,7 +12,12 @@ from pinecone import ServerlessSpec
 from langchain_huggingface import HuggingFaceEmbeddings
 import re
 from llama_index.core.node_parser import SentenceSplitter
+from typing import List, Dict, Any
+
+from rank_bm25 import BM25Okapi
+from collections import Counter
 import uuid
+import numpy as np
 
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -155,7 +160,6 @@ def embed_dataframe(data: pd.DataFrame, embed_model: Any) -> pd.DataFrame:
     logger.info(f"Finished embedding. {len(result_df)} rows successfully embedded")
     return result_df
 
-from typing import List, Dict, Any
 
 def generate_documents(df: pd.DataFrame, chunk_size: int, doc_type: str) -> List[Dict[str, Any]]:
     """
@@ -170,43 +174,73 @@ def generate_documents(df: pd.DataFrame, chunk_size: int, doc_type: str) -> List
         List[Dict[str, Any]]: A list of document dictionaries.
     """
     documents = []
+    
     for _, row in df.iterrows():
-        # Debugging: Print row contents
-        #print(f"Processing row: {row}")
-        
         # Use get() method with a default value to avoid KeyError
         unique_id = row.get('unique_id', str(uuid.uuid4()))
         
         # Prioritize 'id' over 'general_id' for consistency
         general_id = row.get('id', row.get('general_id', 'unknown'))
-        
-        # Debugging: Print ID fields
-        #print(f"unique_id: {unique_id}, general_id: {general_id}")
-        
+
+        # Initialize the document metadata
+        metadata = {
+            "url": row.get("url", ""),
+            "text": row.get("text", ""),
+            'general_id': general_id,
+            'chunk_size': chunk_size,
+            'doc_type': doc_type
+        }
+
+        # Add 'last_updated' to metadata if it exists in the DataFrame
+        if 'last_updated' in row:
+            metadata['date'] = row['last_updated']
+
+        # Extract the entities dictionary and update the metadata with its key-value pairs
+        entities = row.get('entities', {})
+        if isinstance(entities, dict):
+            # Merge the entities dictionary into the metadata dictionary
+            metadata.update(entities)
+
+        # Create the document structure
         document = {
             "unique_id": unique_id,
             'values': row.get("embedding", []),
-            "metadata": {
-                "url": row.get("url", ""),
-                "text": row.get("text", ""),
-                'general_id': general_id,
-                'chunk_size': chunk_size,
-                'doc_type': doc_type
-            }
+            'sparse_values': row.get("bm25_sparse_vector", []),
+            "metadata": metadata
         }
         
-        # Add 'last_updated' to metadata if it exists in the DataFrame
-        if 'last_updated' in row:
-            document['metadata']['date'] = row['last_updated']
-        
+        # Append the document to the list
         documents.append(document)
     
     return documents
 
+def create_vocabulary(df: pd.DataFrame, text_column: str) -> Dict[str, int]:
+    all_words = set()
+    for doc in df[text_column]:
+        all_words.update(doc.lower().split())
+    return {word: i for i, word in enumerate(all_words)}
 
-
-
-import numpy as np
+def apply_bm25_sparse_vectors(df: pd.DataFrame, text_column: str) -> pd.DataFrame:
+    vocab = create_vocabulary(df, text_column)
+    corpus = df[text_column].apply(lambda x: x.lower().split()).tolist()
+    bm25 = BM25Okapi(corpus)
+    
+    def get_bm25_sparse_vector(doc):
+        doc_terms = Counter(doc.lower().split())
+        vector = {}
+        for term in doc_terms:
+            if term in vocab and term in bm25.idf:
+                idf = bm25.idf.get(term, 0)
+                tf = doc_terms[term]
+                doc_len = len(doc.split())
+                numerator = tf * (bm25.k1 + 1)
+                denominator = tf + bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
+                score = idf * (numerator / denominator)
+                vector[vocab[term]] = float(score)
+        return vector
+    
+    df['bm25_sparse_vector'] = df[text_column].apply(get_bm25_sparse_vector)
+    return df
 
 def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, doc_type: str, base_path: str) -> None:
     """

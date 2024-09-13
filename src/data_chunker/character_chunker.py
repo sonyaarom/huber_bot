@@ -1,11 +1,17 @@
 import pandas as pd
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
 from tqdm import tqdm
 from logging import getLogger
 import gc
-from shared_utils import * 
+from shared_utils import *
+from gliner import GLiNER
+from collections import defaultdict
 
 logger = getLogger(__name__)
+
+# Initialize GLiNER model
+ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
+labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
 
 def chunk_text(text: str, chunk_length: int, overlap: int, min_length: int = 50) -> List[str]:
     """
@@ -30,6 +36,16 @@ def get_overlap(chunk_length: int) -> int:
     else:
         return 200
 
+def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[str, List[str]]:
+    """
+    Converts a list of entity dictionaries into a dictionary where each label has a list of entity texts.
+    """
+    label_name_dict = defaultdict(set)
+    for entity in entities:
+        text = entity['text'].strip().lower()
+        label_name_dict[entity['label']].add(text)
+    return {k: list(v) for k, v in label_name_dict.items()}
+
 def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
     chunk_stats = []
 
@@ -52,6 +68,10 @@ def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model:
         exploded_df['unique_id'] = exploded_df.groupby('id').cumcount().add(1).astype(str)
         exploded_df['unique_id'] = exploded_df['id'] + '_' + exploded_df['unique_id']
         
+        # Perform Named Entity Recognition on each chunk
+        logger.info("Performing Named Entity Recognition on chunks")
+        exploded_df['entities'] = exploded_df['chunks'].apply(lambda x: convert_entities_to_label_name_dict(ner_model.predict_entities(x, labels)))
+        
         # Prepare the final DataFrame
         chunked_df = pd.DataFrame({
             'unique_id': exploded_df['unique_id'],
@@ -60,7 +80,8 @@ def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model:
             'html_content': exploded_df['html_content'],
             'text': exploded_df['chunks'],
             'len': exploded_df['len'],
-            'general_id': exploded_df['id']
+            'general_id': exploded_df['id'],
+            'entities': exploded_df['entities']
         })
         
         logger.info(f"Created {len(chunked_df)} chunks")
@@ -79,6 +100,9 @@ def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model:
         logger.info(f"  Mean length: {mean_length:.2f}")
         logger.info(f"  Median length: {median_length:.2f}")
         
+        logger.info("Applying BM25 sparse vectorization")
+        chunked_df = apply_bm25_sparse_vectors(chunked_df, 'text')
+
         logger.info("Embedding chunked texts")
         embedded_df = embed_dataframe(chunked_df, embed_model)
         

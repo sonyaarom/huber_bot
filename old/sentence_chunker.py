@@ -4,24 +4,16 @@ from tqdm import tqdm
 from logging import getLogger
 import gc
 from shared_utils import *
-import tiktoken
+import nltk
 from gliner import GLiNER
-import numpy as np
 from collections import defaultdict
+
+# Download necessary NLTK data
+nltk.download('punkt')
 
 ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
 labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
 logger = getLogger(__name__)
-
-def get_overlap(chunk_length: int) -> int:
-    """
-    Returns the appropriate overlap based on chunk length.
-    """
-    if chunk_length in [128, 256]:
-        return 50
-    else:
-        return 200
-    
 
 def convert_entities_to_label_name_dict(entities):
     label_name_dict = defaultdict(set)  # Use a set instead of a list
@@ -34,31 +26,38 @@ def convert_entities_to_label_name_dict(entities):
     # Convert sets back to lists
     return {k: list(v) for k, v in label_name_dict.items()}
 
-
-def chunk_text(text: str, chunk_size: int, overlap: int, encoding) -> List[str]:
+def chunk_sentences(text: str, chunk_size: int, overlap: int, max_words: int = 512) -> List[str]:
     """
-    Splits the input text into chunks of specified token length with overlap.
+    Splits the input text into chunks of specified sentence count with overlap,
+    while also respecting a maximum word limit.
     """
-    tokens = encoding.encode(text)
+    sentences = nltk.sent_tokenize(text)
     chunks = []
     start = 0
-    while start < len(tokens):
+    while start < len(sentences):
         end = start + chunk_size
-        chunk_tokens = tokens[start:end]
-        chunk = encoding.decode(chunk_tokens)
-        chunks.append(chunk)
+        chunk = []
+        word_count = 0
+        for sentence in sentences[start:end]:
+            sentence_words = sentence.split()
+            if word_count + len(sentence_words) > max_words:
+                break
+            chunk.append(sentence)
+            word_count += len(sentence_words)
+        
+        if chunk:  # Only add non-empty chunks
+            chunks.append(' '.join(chunk))
         start += (chunk_size - overlap)
     return chunks
 
-def process_data_tokens_tiktoken(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
+def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
     chunk_stats = []
-    encoding = tiktoken.get_encoding("cl100k_base")
 
     for chunk_length in chunk_lengths:
-        logger.info(f"Processing token-based chunks with length: {chunk_length}")
+        logger.info(f"Processing sentence-based chunks with length: {chunk_length}")
 
         # Calculate overlap
-        overlap = get_overlap(chunk_length)
+        overlap = 1  # For sentence-based chunking, we'll use a fixed overlap of 1 sentence
         logger.info(f"Using overlap of {overlap} for chunk length {chunk_length}")
 
         # Process all rows
@@ -72,7 +71,7 @@ def process_data_tokens_tiktoken(df: pd.DataFrame, chunk_lengths: List[int], emb
 
         for _, row in tqdm(df.iterrows(), total=len(df), desc="Chunking texts"):
             if isinstance(row['text'], str):
-                chunks = chunk_text(row['text'], chunk_length, overlap, encoding)
+                chunks = chunk_sentences(row['text'], chunk_length, overlap)
                 all_chunks.extend(chunks)
                 unique_ids.extend([f"{row['id']}_{i+1}" for i in range(len(chunks))])
                 general_ids.extend([row['id']] * len(chunks))
@@ -88,13 +87,13 @@ def process_data_tokens_tiktoken(df: pd.DataFrame, chunk_lengths: List[int], emb
             'last_updated': last_updateds,
             'html_content': html_contents,
             'text': all_chunks,
-            'len': [len(encoding.encode(chunk)) for chunk in all_chunks],
+            'len': [len(chunk.split()) for chunk in all_chunks],  # Word count instead of token count
             'general_id': general_ids,
             'entities': entities
         })
 
-        # Remove chunks shorter than 50 tokens
-        chunked_df = chunked_df[chunked_df['len'] >= 50]
+        # Remove chunks shorter than 10 words
+        chunked_df = chunked_df[chunked_df['len'] >= 10]
 
         logger.info(f"Created {len(chunked_df)} chunks")
 
@@ -119,10 +118,10 @@ def process_data_tokens_tiktoken(df: pd.DataFrame, chunk_lengths: List[int], emb
         embedded_df = embed_dataframe(chunked_df, embed_model)
 
         logger.info("Generating document dictionaries")
-        documents = generate_documents(embedded_df, chunk_length, 'token')
+        documents = generate_documents(embedded_df, chunk_length, 'sentence')
 
         logger.info("Saving documents to JSON")
-        save_documents_to_json(documents, chunk_length, embed_model_name, 'token', base_path)
+        save_documents_to_json(documents, chunk_length, embed_model_name, 'sentence', base_path)
 
         # Clear memory
         del chunked_df, embedded_df, documents
