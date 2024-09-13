@@ -18,18 +18,12 @@ logger = logging.getLogger(__name__)
 
 
 class VectorFileHandler(FileSystemEventHandler):
-    def __init__(self, pinecone_client, embedding_model_name, project_name):
+    def __init__(self, pinecone_client, embedding_model_name, project_name, metric):
         self.pc = pinecone_client
         self.embedding_model_name = embedding_model_name
         self.project_name = project_name
-        logger.info(f"VectorFileHandler initialized with embedding model: {embedding_model_name} and project: {project_name}")
-
-    def on_created(self, event):
-        if event.is_directory:
-            return
-        if event.src_path.endswith('.json') and self.embedding_model_name in event.src_path:
-            logger.info(f"New file detected: {event.src_path}")
-            self.process_file(event.src_path)
+        self.metric = metric
+        logger.info(f"VectorFileHandler initialized with embedding model: {embedding_model_name}, project: {project_name}, and metric: {metric}")
 
     def process_file(self, file_path):
         logger.info(f"Processing file: {file_path}")
@@ -56,8 +50,8 @@ class VectorFileHandler(FileSystemEventHandler):
             # Create a dictionary with chunk_size as key and documents as value
             documents_dict = {chunk_size: documents}
             
-            # Call upload_to_pinecone with the dictionary and project name
-            upload_to_pinecone(documents_dict, self.pc, self.embedding_model_name, doc_type, self.project_name)
+            # Call upload_to_pinecone with the dictionary, project name, and metric
+            upload_to_pinecone(documents_dict, self.pc, self.embedding_model_name, doc_type, self.project_name, self.metric)
             
             logger.info(f"Successfully uploaded vectors from {file_path}")
         except json.JSONDecodeError:
@@ -143,9 +137,9 @@ def delete_all_indexes(pinecone_client, interactive=True):
     logger.info("Finished deletion process")
 
 
-def upload_files(folder_path, pinecone_client, embedding_model_name, project_name):
-    logger.info(f"Processing files in folder: {folder_path} for project: {project_name}")
-    event_handler = VectorFileHandler(pinecone_client, embedding_model_name, project_name)
+def upload_files(folder_path, pinecone_client, embedding_model_name, project_name, metric):
+    logger.info(f"Processing files in folder: {folder_path} for project: {project_name} with metric: {metric}")
+    event_handler = VectorFileHandler(pinecone_client, embedding_model_name, project_name, metric)
     
     # Process existing files
     for filename in os.listdir(folder_path):
@@ -176,6 +170,7 @@ def main():
     parser.add_argument("--embedding_model", type=str, required=True, help="Name of the embedding model")
     parser.add_argument("--project", type=str, default="default", help="Project name for the indexes")
     parser.add_argument("--api_key", type=str, help="Pinecone API key")
+    parser.add_argument("--metric", choices=['dotproduct', 'cosine', 'euclidean'], default='cosine', help="Distance metric for the index")
     
     args = parser.parse_args()
     
@@ -215,7 +210,7 @@ def main():
         elif args.folder:
             logger.info(f"Upload option selected for folder: {args.folder}")
             try:
-                upload_files(args.folder, pc, args.embedding_model, args.project)
+                upload_files(args.folder, pc, args.embedding_model, args.project, args.metric)
             except Exception as e:
                 logger.error(f"Error during file upload: {str(e)}")
         else:
@@ -237,6 +232,6 @@ if __name__ == "__main__":
 #python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf
 
 #python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf --project chatbot-all-mini
-#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model all-mini --project chatbot-all-mini
+#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model snowfl --project chatbot-all-mini --metric cosine
 #TODO: add functionality to define project name 
 
