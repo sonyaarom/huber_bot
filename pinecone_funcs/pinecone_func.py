@@ -122,7 +122,7 @@ def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], pc: Pinecone,
             continue
         
         dimension = len(cleaned_docs[0]['values'])
-        index_name = f"{embedding_model_name.replace('_', '-')}-{doc_type}-dim{dimension}-chunk{chunk_size}"
+        index_name = f"{embedding_model_name.replace('_', '-')}-{doc_type}-dim{dimension}-b{chunk_size}"
         
         index, is_new = create_pinecone_index(pc, index_name, dimension, project_name, metric=metric)
         

@@ -225,13 +225,7 @@ def main():
 
 if __name__ == "__main__":
     main()
-# Example usage:
-# python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model all-mini --project chatbot_all_mini
-#python pinecone_uploader.py --delete --embedding_model hf
-#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf
-#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf
 
-#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model hf --project chatbot-all-mini
-#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/assets/docs --embedding_model snowfl --project chatbot-all-mini --metric cosine
-#TODO: add functionality to define project name 
 
+#python pinecone_uploader.py --folder FOLDER --embedding_model EMBED_NAME  --project PROJECT_INTERNAL --metric dotproduct/euclidean/cosine  --api_key API_KEY
+#python pinecone_uploader.py --delete all --embedding_model EMBED_NAME --api_key API_KEY
