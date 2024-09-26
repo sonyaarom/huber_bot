@@ -41,14 +41,15 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
 
 from shared_utils import get_embeddings, embed_dataframe
 #options for encode model = "all-MiniLM-L6-v2" or "hf", 'Snowflake/snowflake-arctic-embed-l' 
-def main(chunk_types: List[str] = ['char', 'token', 'semantic', 'recursive'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
+
+def main(chunk_types: List[str] = ['recursive', 'char'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
         load_dotenv()
         
         df_path = os.path.join(assets_dir, 'csv', 'data_subset.csv')
-        chunk_sizes = [128, 256, 512, 1024] 
+        chunk_sizes = [128, 256, 512] 
         if embed_model_name == None:
-            embed_model_name = embed_model
+            embed_model_name = encode_model
 
         docs_path = os.path.join(assets_dir, 'docs')
         
@@ -86,27 +87,29 @@ def main(chunk_types: List[str] = ['char', 'token', 'semantic', 'recursive'], en
         # Embed the dataframe
         df_embedded = embed_dataframe(df, embed_model)
         
+        # Load or create BM25 corpus
+        bm25_corpus_path = os.path.join(assets_dir, 'bm25_values.json')
+        bm25_values = load_bm25_values(bm25_corpus_path)
+        if bm25_values is None:
+            bm25_values = create_and_save_bm25_corpus(df_embedded, 'text', bm25_corpus_path)
+        
         # Process chunks based on the specified types
         for chunk_type in chunk_types:
-            # if chunk_type == "sentence":
-            #     logger.info("Processing sentence-based chunks")
-            #     sentence_stats = process_data_sentences(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
-            #     log_chunk_stats("Sentence-based", sentence_stats)
             if chunk_type == "char":
                 logger.info("Processing character-based chunks")
-                char_stats = process_data_tokens(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                char_stats = process_data_tokens(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path, bm25_values)
                 log_chunk_stats("Character-based", char_stats)
             elif chunk_type == "semantic":
                 logger.info("Processing semantic chunks using TextTiling")
-                semantic_stats = process_data_semantic(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                semantic_stats = process_data_semantic(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path, bm25_values)
                 log_chunk_stats("Semantic (TextTiling)", semantic_stats)
             elif chunk_type == "recursive":
                 logger.info("Processing recursive chunks using LangChain")
-                recursive_stats = process_data_recursive_langchain(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                recursive_stats = process_data_recursive_langchain(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path, bm25_values)
                 log_chunk_stats("Recursive (LangChain)", recursive_stats)
             elif chunk_type == "token":
                 logger.info("Processing token-based chunks using tiktoken")
-                token_stats = process_data_tokens_tiktoken(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path)
+                token_stats = process_data_tokens_tiktoken(df_embedded, chunk_sizes, embed_model, embed_model_name, docs_path, bm25_values)
                 log_chunk_stats("Token-based (tiktoken)", token_stats)
         
         logger.info("Chunk creation process completed successfully")

@@ -10,10 +10,10 @@
 --------
 
 7. How to improve retriever?:
-    7.1. Retriever sentence based
-    7.2. Retriever token based
-    7.3. Semantic Retriever
-Named Entity Recognition
+    7.1. Retriever sentence based+
+    7.2. Retriever token based+
+    7.3. Semantic Retriever+
+Named Entity Recognition+
 
 8. How to store data better? Meta tags? Entity detection?
 
@@ -34,7 +34,7 @@ Literature:
 
 
 TO DO CURRENT:
-1. Basic retriever and LLM: experiments with different chunk sizes. What should be the metrics? (128, 256, 512, or 1024.)
+1. Basic retriever and LLM: experiments with different chunk sizes. What should be the metrics? (128, 256, 512, or 1024.)+
 2. Metrics:
  * Recall@K:
  * Precision@K
@@ -53,9 +53,38 @@ Feedback Loops:
 
 
 Model Management:
-1. Develop techniques for the model to acknowledge uncertainty or lack of information.
+1. Develop techniques for the model to acknowledge uncertainty or lack of information.???
 
 
 1.Gao et al.’s [12] 
 2. https://medium.com/@bijit211987/strategies-for-optimal-performance-of-rag-6faa1b79cd45
 3. https://towardsai.net/p/machine-learning/evaluating-rag-metrics-across-different-retrieval-methods
+
+
+TODO: 13th September
+- remove duplicates from retrieved entities
+- create indexes for 3 embeddings and 4 lengths
+- test retriever: sparse, dense, hybrid
+- which similarity does hybrid support?
+
+
+TODO: 14th September
+- Parent chunk retriever? How to perform?
+- What are other possible retrievers?
+- Ensemble retriever chain?
+- Reranking?
+
+
+TODO: 16th September
+- Finish report for testing embeddings and retrievers
+
+TODO: 17th September
+- Clean the code for chunker, embeddings and upload
+- Git merge to the main 
+- CI/CD?
+
+TODO: 18th September
+- Prompt: what are the approaches?
+- Where to place the chunk?
+- Prompt versioning, how to store?
+

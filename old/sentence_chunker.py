@@ -57,8 +57,8 @@ def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_mod
         logger.info(f"Processing sentence-based chunks with length: {chunk_length}")
 
         # Calculate overlap
-        overlap = 1  # For sentence-based chunking, we'll use a fixed overlap of 1 sentence
-        logger.info(f"Using overlap of {overlap} for chunk length {chunk_length}")
+        overlap = max(1, chunk_length // 4)  # 25% overlap, minimum 1 sentence
+        logger.info(f"Using overlap of {overlap} sentences for chunk length {chunk_length}")
 
         # Process all rows
         all_chunks = []
@@ -69,9 +69,11 @@ def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_mod
         html_contents = []
         entities = []
 
+        total_chunks = 0
         for _, row in tqdm(df.iterrows(), total=len(df), desc="Chunking texts"):
             if isinstance(row['text'], str):
-                chunks = chunk_sentences(row['text'], chunk_length, overlap)
+                chunks = chunk_sentences(row['text'], chunk_length, overlap, max_words=512)
+                total_chunks += len(chunks)
                 all_chunks.extend(chunks)
                 unique_ids.extend([f"{row['id']}_{i+1}" for i in range(len(chunks))])
                 general_ids.extend([row['id']] * len(chunks))
@@ -80,6 +82,8 @@ def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_mod
                 html_contents.extend([row.get('html_content', '')] * len(chunks))
                 entities.extend([convert_entities_to_label_name_dict(ner_model.predict_entities(chunk, labels)) for chunk in chunks])
 
+        logger.info(f"Total chunks created: {total_chunks}")
+
         # Create the chunked DataFrame
         chunked_df = pd.DataFrame({
             'unique_id': unique_ids,
@@ -87,15 +91,18 @@ def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_mod
             'last_updated': last_updateds,
             'html_content': html_contents,
             'text': all_chunks,
-            'len': [len(chunk.split()) for chunk in all_chunks],  # Word count instead of token count
+            'len': [len(chunk.split()) for chunk in all_chunks],  # Word count
             'general_id': general_ids,
             'entities': entities
         })
 
         # Remove chunks shorter than 10 words
+        initial_chunk_count = len(chunked_df)
         chunked_df = chunked_df[chunked_df['len'] >= 10]
+        removed_chunks = initial_chunk_count - len(chunked_df)
+        logger.info(f"Removed {removed_chunks} chunks shorter than 10 words")
 
-        logger.info(f"Created {len(chunked_df)} chunks")
+        logger.info(f"Final chunk count: {len(chunked_df)}")
 
         # Compute statistics
         min_length = chunked_df['len'].min()
@@ -105,12 +112,12 @@ def process_data_sentences(df: pd.DataFrame, chunk_lengths: List[int], embed_mod
         chunk_stats.append((chunk_length, min_length, max_length, mean_length, median_length))
 
         # Print length statistics
-        logger.info(f"Chunk length statistics for target length {chunk_length}:")
-        logger.info(f"  Minimum length: {min_length}")
-        logger.info(f"  Maximum length: {max_length}")
-        logger.info(f"  Mean length: {mean_length:.2f}")
-        logger.info(f"  Median length: {median_length:.2f}")
-
+        logger.info(f"Chunk length statistics for target sentence count {chunk_length}:")
+        logger.info(f"  Minimum length: {min_length} words")
+        logger.info(f"  Maximum length: {max_length} words")
+        logger.info(f"  Mean length: {mean_length:.2f} words")
+        logger.info(f"  Median length: {median_length:.2f} words")
+        
         logger.info("Applying BM25 sparse vectorization")
         chunked_df = apply_bm25_sparse_vectors(chunked_df, 'text')
 

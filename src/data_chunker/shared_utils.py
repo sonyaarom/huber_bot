@@ -1,5 +1,6 @@
 #shared utils
 import pandas as pd
+import numpy as np
 import os
 import sys
 from tqdm import tqdm
@@ -17,7 +18,7 @@ from typing import List, Dict, Any
 from rank_bm25 import BM25Okapi
 from collections import Counter
 import uuid
-import numpy as np
+
 
 # Get the directory of the current script
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -71,6 +72,91 @@ def initialize_pinecone():
         logger.error(f"Failed to initialize Pinecone: {str(e)}")
         raise
 
+def load_bm25_values(file_path: str) -> dict:
+    """
+    Loads BM25 values from a JSON file if it exists.
+
+    Args:
+        file_path (str): Path to the BM25 values JSON file.
+
+    Returns:
+        dict: Loaded BM25 values or None if the file doesn't exist.
+    """
+    if os.path.exists(file_path):
+        with open(file_path, 'r') as f:
+            bm25_values = json.load(f)
+        logger.info(f"Loaded existing BM25 values from {file_path}")
+        return bm25_values
+    return None
+
+def create_and_save_bm25_corpus(df: pd.DataFrame, text_column: str, output_path: str, force_create: bool = False):
+    """
+    Creates a BM25 corpus from the input DataFrame and saves it to a JSON file,
+    or loads existing values if the file exists and force_create is False.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing the text data.
+        text_column (str): Name of the column containing the text data.
+        output_path (str): Path to save/load the BM25 corpus JSON file.
+        force_create (bool): If True, create new BM25 values even if the file exists.
+
+    Returns:
+        dict: The BM25 corpus values.
+    """
+    if not force_create:
+        existing_values = load_bm25_values(output_path)
+        if existing_values:
+            return existing_values
+
+    logger.info("Creating new BM25 corpus")
+    tokenized_corpus = [doc.lower().split() for doc in df[text_column]]
+    bm25 = BM25Okapi(tokenized_corpus)
+
+    bm25_values = {
+        "idf": dict(bm25.idf),
+        "avgdl": bm25.avgdl,
+        "k1": bm25.k1,
+        "b": bm25.b,
+        "vocabulary": list(bm25.idf.keys())
+    }
+
+    with open(output_path, 'w') as f:
+        json.dump(bm25_values, f)
+
+    logger.info(f"BM25 corpus saved to {output_path}")
+    return bm25_values
+
+
+def apply_bm25_sparse_vectors(df: pd.DataFrame, text_column: str, bm25_values: dict) -> pd.DataFrame:
+    """
+    Applies BM25 sparse vectors to chunked data using pre-computed BM25 values.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing the chunked text data.
+        text_column (str): Name of the column containing the text data.
+        bm25_values (dict): Pre-computed BM25 values.
+
+    Returns:
+        pd.DataFrame: DataFrame with added 'bm25_sparse_vector' column.
+    """
+    vocab = {word: i for i, word in enumerate(bm25_values["vocabulary"])}
+
+    def get_bm25_sparse_vector(doc):
+        doc_terms = Counter(doc.lower().split())
+        vector = {}
+        doc_len = len(doc.split())
+        for term in doc_terms:
+            if term in vocab and term in bm25_values["idf"]:
+                idf = bm25_values["idf"][term]
+                tf = doc_terms[term]
+                numerator = tf * (bm25_values["k1"] + 1)
+                denominator = tf + bm25_values["k1"] * (1 - bm25_values["b"] + bm25_values["b"] * doc_len / bm25_values["avgdl"])
+                score = idf * (numerator / denominator)
+                vector[vocab[term]] = float(score)
+        return vector
+
+    df['bm25_sparse_vector'] = df[text_column].apply(get_bm25_sparse_vector)
+    return df
 
 def create_pinecone_index(pc: Pinecone, index_name: str, dimension: int, cloud: str = "aws", region: str = "us-east-1"):
     """
@@ -220,27 +306,27 @@ def create_vocabulary(df: pd.DataFrame, text_column: str) -> Dict[str, int]:
         all_words.update(doc.lower().split())
     return {word: i for i, word in enumerate(all_words)}
 
-def apply_bm25_sparse_vectors(df: pd.DataFrame, text_column: str) -> pd.DataFrame:
-    vocab = create_vocabulary(df, text_column)
-    corpus = df[text_column].apply(lambda x: x.lower().split()).tolist()
-    bm25 = BM25Okapi(corpus)
+# def apply_bm25_sparse_vectors(df: pd.DataFrame, text_column: str) -> pd.DataFrame:
+#     vocab = create_vocabulary(df, text_column)
+#     corpus = df[text_column].apply(lambda x: x.lower().split()).tolist()
+#     bm25 = BM25Okapi(corpus)
     
-    def get_bm25_sparse_vector(doc):
-        doc_terms = Counter(doc.lower().split())
-        vector = {}
-        for term in doc_terms:
-            if term in vocab and term in bm25.idf:
-                idf = bm25.idf.get(term, 0)
-                tf = doc_terms[term]
-                doc_len = len(doc.split())
-                numerator = tf * (bm25.k1 + 1)
-                denominator = tf + bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
-                score = idf * (numerator / denominator)
-                vector[vocab[term]] = float(score)
-        return vector
+#     def get_bm25_sparse_vector(doc):
+#         doc_terms = Counter(doc.lower().split())
+#         vector = {}
+#         for term in doc_terms:
+#             if term in vocab and term in bm25.idf:
+#                 idf = bm25.idf.get(term, 0)
+#                 tf = doc_terms[term]
+#                 doc_len = len(doc.split())
+#                 numerator = tf * (bm25.k1 + 1)
+#                 denominator = tf + bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
+#                 score = idf * (numerator / denominator)
+#                 vector[vocab[term]] = float(score)
+#         return vector
     
-    df['bm25_sparse_vector'] = df[text_column].apply(get_bm25_sparse_vector)
-    return df
+#     df['bm25_sparse_vector'] = df[text_column].apply(get_bm25_sparse_vector)
+#     return df
 
 def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, doc_type: str, base_path: str) -> None:
     """
@@ -253,7 +339,7 @@ def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, d
         doc_type (str): The type of document ('sentence', 'token', or 'semantic_texttiling').
         base_path (str): The base path where to save the JSON file.
     """
-    filename = f"{doc_type}-vectors-{chunk_size}chunksize-{model_name}.json"
+    filename = f"{doc_type}-vectors-{chunk_size}chunksize-{model_name}-sparse.json"
     filepath = os.path.join(base_path, filename)
     logger.info(f"Saving {len(docs)} documents to {filepath}")
     os.makedirs(os.path.dirname(filepath), exist_ok=True)

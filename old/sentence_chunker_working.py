@@ -44,6 +44,33 @@ def chunk_text_by_sentences(text, chunk_size=2000, chunk_overlap=200, min_chunk_
     logger.debug(f"Created {len(processed_chunks)} sentence-based chunks.")
     return processed_chunks
 
+def chunk_sentences_by_chars(text: str, chunk_size: int, overlap: int) -> List[str]:
+    """
+    Splits the input text into chunks of specified character count with overlap,
+    while respecting sentence boundaries.
+    """
+    sentences = nltk.sent_tokenize(text)
+    chunks = []
+    current_chunk = ""
+    current_chunk_chars = 0
+
+    for sentence in sentences:
+        if current_chunk_chars + len(sentence) > chunk_size and current_chunk:
+            chunks.append(current_chunk.strip())
+            # Move back by the overlap
+            while current_chunk_chars > overlap:
+                removed_sentence = current_chunk.split('.', 1)[0] + '.'
+                current_chunk = current_chunk[len(removed_sentence):].strip()
+                current_chunk_chars -= len(removed_sentence)
+        
+        current_chunk += " " + sentence
+        current_chunk_chars += len(sentence) + 1  # +1 for the space
+
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+
+    return chunks
+    
 def chunk_dataframe(data: pd.DataFrame, chunk_size: int, chunk_overlap: int) -> Tuple[pd.DataFrame, int, int, float, float]:
     logger.info(f"Starting to chunk dataframe with chunk size: {chunk_size} and overlap: {chunk_overlap}")
     new_rows = []

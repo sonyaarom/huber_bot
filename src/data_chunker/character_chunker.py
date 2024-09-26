@@ -46,7 +46,8 @@ def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[
         label_name_dict[entity['label']].add(text)
     return {k: list(v) for k, v in label_name_dict.items()}
 
-def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
+
+def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str, bm25_values: dict) -> List[Tuple[int, int, int, float, float]]:
     chunk_stats = []
 
     for chunk_length in chunk_lengths:
@@ -101,7 +102,7 @@ def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model:
         logger.info(f"  Median length: {median_length:.2f}")
         
         logger.info("Applying BM25 sparse vectorization")
-        chunked_df = apply_bm25_sparse_vectors(chunked_df, 'text')
+        chunked_df = apply_bm25_sparse_vectors(chunked_df, 'text', bm25_values)
 
         logger.info("Embedding chunked texts")
         embedded_df = embed_dataframe(chunked_df, embed_model)

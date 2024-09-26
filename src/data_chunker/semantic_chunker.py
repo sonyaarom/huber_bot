@@ -140,7 +140,7 @@ def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFra
         logger.info(f"Processed batch. Created {len(result)} chunks from {end-start} rows.")
         yield result
 
-def process_data_semantic(df: pd.DataFrame, chunk_sizes: List[int], embed_model: Any, embed_model_name: str, base_path: str) -> List[Tuple[int, int, int, float, float]]:
+def process_data_semantic(df: pd.DataFrame, chunk_sizes: List[int], embed_model: Any, embed_model_name: str, base_path: str,  bm25_values: dict) -> List[Tuple[int, int, int, float, float]]:
     chunk_stats = []
     for chunk_size in chunk_sizes:
         logger.info(f"Processing semantic chunks with target size: {chunk_size}")
@@ -164,7 +164,7 @@ def process_data_semantic(df: pd.DataFrame, chunk_sizes: List[int], embed_model:
         logger.info(f"Chunk length statistics: Min = {min_length}, Max = {max_length}, Mean = {mean_length:.2f}, Median = {median_length:.2f}")
         
         logger.info("Applying BM25 sparse vectorization")
-        chunked_df = apply_bm25_sparse_vectors(all_chunks, 'text')
+        chunked_df = apply_bm25_sparse_vectors(all_chunks, 'text', bm25_values)
 
         logger.info("Embedding chunked texts")
         embedded_df = embed_dataframe(chunked_df, embed_model)
