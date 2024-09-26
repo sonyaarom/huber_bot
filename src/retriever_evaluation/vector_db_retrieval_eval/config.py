@@ -7,7 +7,7 @@ load_dotenv()
 # API Configurations
 API_CONFIGS = {
     "PROJECT_NAME": {
-        "api_key": API_KEY,
+        "api_key": 'API_KEY',
         "default_embedding_model": "sentence-transformers/all-mpnet-base-v2"
     },
     
