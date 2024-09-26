@@ -1,0 +1,49 @@
+{
+    "os": "macOS-14.3-arm64-arm-64bit",
+    "python": "3.11.9",
+    "heartbeatAt": "2024-09-09T18:50:29.045265",
+    "startedAt": "2024-09-09T18:50:27.449994",
+    "docker": null,
+    "cuda": null,
+    "args": [],
+    "state": "running",
+    "program": "/Users/s.konchakova/Thesis/src/retriever_evaluation/retriever_test.py",
+    "codePathLocal": null,
+    "codePath": "src/retriever_evaluation/retriever_test.py",
+    "git": {
+        "remote": "git@github.com:sonyaarom/huber_bot.git",
+        "commit": "85e9ab715b483ad47445369d794ea0e3430b7ede"
+    },
+    "email": null,
+    "root": "/Users/s.konchakova/Thesis",
+    "host": "skonchakova.fritz.box",
+    "username": "s.konchakova",
+    "executable": "/Users/s.konchakova/Thesis/huber/bin/python",
+    "cpu_count": 8,
+    "cpu_count_logical": 8,
+    "cpu_freq": {
+        "current": 4056,
+        "min": 744,
+        "max": 4056
+    },
+    "cpu_freq_per_core": [
+        {
+            "current": 4056,
+            "min": 744,
+            "max": 4056
+        }
+    ],
+    "disk": {
+        "/": {
+            "total": 460.4317207336426,
+            "used": 13.402233123779297
+        }
+    },
+    "gpuapple": {
+        "type": "arm",
+        "vendor": "Apple"
+    },
+    "memory": {
+        "total": 16.0
+    }
+}

@@ -9,7 +9,82 @@
 6. How to update Pinecone?
 --------
 
-7. How to improve retriever? 
+7. How to improve retriever?:
+    7.1. Retriever sentence based+
+    7.2. Retriever token based+
+    7.3. Semantic Retriever+
+Named Entity Recognition+
+
 8. How to store data better? Meta tags? Entity detection?
 
+#semantic based, token based and sentence based
+#NER
+#embedding models
+#
+
+
+--------
+Literature:
+1. Jiang et al., (2023) [5] introduce FLARE (Forward-Looking Active Retrieval Augmented Generation), a novel method designed to enhance RAG systems. :
+    * Evaluation metrics include exact match (EM), token-level F1, precision, recall, RoBERTa-based QA score (DisambigF1), ROUGE, and an overall DR score combining DisambigF1 and ROUGE.
+    * Pierre et al., (2024) - Query Optimisation
+    * Jin et al., (2024) - Dynamic Retriever
+    * Johnson, Douze and J´egou (2017)  - FAISS algorithm for indexing vector embeddings in vector databases
+
+
+
+TO DO CURRENT:
+1. Basic retriever and LLM: experiments with different chunk sizes. What should be the metrics? (128, 256, 512, or 1024.)+
+2. Metrics:
+ * Recall@K:
+ * Precision@K
+ * Mean Average Precision (MAP)
+ * Normalized Discounted Cumulative Gain (NDCG)
+ * F1 Score 
+ * Answer Accuracy
+ * RAGAS?
+
+Retrievers:
+1. Parent Document Retriever Chain [3]
+2. Ensemble Retriever Chain [3]
+
+Feedback Loops:
+1. Develop mechanisms to collect and incorporate user feedback for continuous improvement. [2]
+
+
+Model Management:
+1. Develop techniques for the model to acknowledge uncertainty or lack of information.???
+
+
+1.Gao et al.’s [12] 
+2. https://medium.com/@bijit211987/strategies-for-optimal-performance-of-rag-6faa1b79cd45
+3. https://towardsai.net/p/machine-learning/evaluating-rag-metrics-across-different-retrieval-methods
+
+
+TODO: 13th September
+- remove duplicates from retrieved entities
+- create indexes for 3 embeddings and 4 lengths
+- test retriever: sparse, dense, hybrid
+- which similarity does hybrid support?
+
+
+TODO: 14th September
+- Parent chunk retriever? How to perform?
+- What are other possible retrievers?
+- Ensemble retriever chain?
+- Reranking?
+
+
+TODO: 16th September
+- Finish report for testing embeddings and retrievers
+
+TODO: 17th September
+- Clean the code for chunker, embeddings and upload
+- Git merge to the main 
+- CI/CD?
+
+TODO: 18th September
+- Prompt: what are the approaches?
+- Where to place the chunk?
+- Prompt versioning, how to store?
 

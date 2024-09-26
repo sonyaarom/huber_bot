@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>HUBer Chat Bot</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" rel="stylesheet">
+    <style>
+        body, html {
+            height: 100%;
+            margin: 0;
+            font-family: 'Poppins', sans-serif;
+            background-color: #f0f2f5;
+            transition: background-color 0.3s ease;
+        }
+
+        body.dark-mode {
+            background-color: #1a1a1a;
+            color: #ffffff;
+        }
+
+        .wrapper {
+            display: flex;
+            height: 100%;
+        }
+
+        .sidebar {
+            width: 80px;
+            background-color: #0b3d91;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px 0;
+            transition: width 0.3s ease;
+        }
+
+        .sidebar:hover {
+            width: 200px;
+        }
+
+        .sidebar-icon {
+            color: white;
+            font-size: 24px;
+            margin-bottom: 30px;
+            cursor: pointer;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            width: 100%;
+            padding-left: 28px;
+            position: relative;
+        }
+
+        .sidebar-icon:hover {
+            transform: scale(1.1);
+        }
+
+        .sidebar:hover .sidebar-text {
+            display: inline;
+            margin-left: 10px;
+        }
+
+        .sidebar-text {
+            display: none;
+            color: white;
+            font-size: 14px;
+        }
+
+        .tooltip {
+            position: absolute;
+            top: 50%;
+            left: 100%;
+            margin-left: 10px;
+            padding: 5px 10px;
+            background-color: #000;
+            color: #fff;
+            border-radius: 4px;
+            white-space: nowrap;
+            transform: translateY(-50%);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.3s, visibility 0.3s;
+        }
+
+        .sidebar-icon:hover .tooltip {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .main {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            max-width: 1000px;
+            margin: 0 auto;
+            position: relative;
+        }
+
+        .main-header {
+            border-bottom: 2px solid #0b3d91;
+            color: #0b3d91;
+            padding: 10px 0;
+            text-align: left;
+            display: flex;
+            align-items: center;
+        }
+
+        .dark-mode .main-header {
+            border-bottom-color: #ffffff;
+            color: #ffffff;
+        }
+
+        .logo {
+            width: 50px;
+            height: auto;
+            margin-right: 15px;
+        }
+
+        .main-content {
+            flex: 1;
+            overflow-y: auto;
+            padding: 20px;
+        }
+
+        .main-content ul {
+            list-style-type: none;
+            padding: 0;
+        }
+
+        .main-content ul li {
+            margin-bottom: 20px;
+            animation: fadeIn 0.5s ease;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .main-content ul li.bot-message {
+            align-items: flex-start;
+        }
+
+        .main-content ul li.user-message {
+            align-items: flex-end;
+        }
+
+        .main-content ul li .message-content {
+            max-width: 80%;
+            padding: 15px;
+            border-radius: 20px;
+            word-wrap: break-word;
+        }
+
+        .main-content ul li.bot-message .message-content {
+            background-color: #f0f2f5;  /* Light grey background */
+            color: black;  /* Black text color */
+            border-radius: 0 20px 20px 20px;  /* Rounded corners except top-left */
+            padding: 15px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+
+        .main-content ul li.user-message .message-content {
+            background-color: #0b3d91;
+            color: white;
+            border-radius: 20px 0 20px 20px;
+        }
+
+        .dark-mode .main-content ul li.bot-message .message-content {
+            background-color: #2a2a2a;  /* Darker background for dark mode */
+            color: white;  /* White text for dark mode */
+        }
+
+        .dark-mode .main-content ul li.user-message .message-content {
+            background-color: #0b3d91;
+        }
+
+        .feedback {
+            display: flex;
+            justify-content: flex-end;
+            margin-top: 5px;
+        }
+
+        .feedback i {
+            cursor: pointer;
+            margin-left: 10px;
+            color: #0b3d91;
+            transition: transform 0.3s ease, color 0.3s ease;
+        }
+
+        .feedback i:hover {
+            transform: scale(1.2);
+        }
+
+        .feedback i.active {
+            color: #28a745;
+        }
+
+        .feedback i.active.fa-thumbs-down {
+            color: #dc3545;
+        }
+
+        .dark-mode .feedback i {
+            color: #ffffff;
+        }
+
+        .dark-mode .feedback i.active {
+            color: #28a745;
+        }
+
+        .dark-mode .feedback i.active.fa-thumbs-down {
+            color: #dc3545;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .input-form {
+            display: flex;
+            padding: 20px;
+            background-color: #f0f2f5;
+            border-top: 1px solid #ddd;
+        }
+
+        .dark-mode .input-form {
+            background-color: #2a2a2a;
+            border-top-color: #444444;
+        }
+
+        .input-form input {
+            flex: 1;
+            padding: 15px;
+            font-size: 16px;
+            border: 2px solid #0b3d91;
+            border-radius: 25px;
+            margin-right: 10px;
+            transition: 0.3s;
+        }
+
+        .dark-mode .input-form input {
+            background-color: #333333;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .input-form input:focus {
+            border-color: #0b3d91;
+            box-shadow: 0 0 10px rgba(11, 61, 145, 0.3);
+        }
+
+        .input-form button {
+            padding: 15px 30px;
+            font-size: 16px;
+            background-color: #0b3d91;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: 0.3s;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .input-form button:hover {
+            background-color: #082d6e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(11, 61, 145, 0.3);
+        }
+
+        .how-to-use {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            background-color: rgba(255, 255, 255, 0.9);
+            border-radius: 15px;
+            padding: 20px;
+            width: 300px;
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.1);
+            display: none;
+            backdrop-filter: blur(5px);
+            animation: slideIn 0.3s ease;
+        }
+
+        .dark-mode .how-to-use {
+            background-color: rgba(42, 42, 42, 0.9);
+            color: #ffffff;
+        }
+
+        @keyframes slideIn {
+            from { transform: translateX(100%); }
+            to { transform: translateX(0); }
+        }
+
+        .how-to-use h3 {
+            color: #0b3d91;
+            margin-bottom: 20px;
+            font-weight: 600;
+        }
+
+        .dark-mode .how-to-use h3 {
+            color: #ffffff;
+        }
+
+        .rule-cloud {
+            background-color: #ffffff;
+            border-radius: 20px;
+            padding: 15px;
+            margin-bottom: 15px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+            transition: 0.3s;
+        }
+
+        .dark-mode .rule-cloud {
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        .rule-cloud:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 6px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        .how-to-use-btn {
+            position: fixed;
+            right: 20px;
+            top: 20px;
+            background-color: #0b3d91;
+            color: white;
+            border: none;
+            border-radius: 25px;
+            padding: 10px 20px;
+            cursor: pointer;
+            transition: 0.3s;
+            font-weight: 600;
+            letter-spacing: 1px;
+        }
+
+        .how-to-use-btn:hover {
+            background-color: #082d6e;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(11, 61, 145, 0.3);
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            cursor: pointer;
+            font-size: 28px;
+            color: #0b3d91;
+            font-weight: bold;
+            transition: transform 0.3s;
+        }
+
+        .close-btn:hover {
+            transform: rotate(90deg);
+        }
+
+        .dark-mode .close-btn {
+            color: #ffffff;
+        }
+
+        .contact-info {
+            background-color: #e8f4ff;
+            color: #0b3d91;
+            padding: 15px;
+            border-radius: 15px;
+            margin-top: 20px;
+            text-align: center;
+            font-size: 14px;
+        }
+
+        .dark-mode .contact-info {
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        .contact-info strong {
+            font-weight: 600;
+        }
+
+        .examples {
+            margin-top: 20px;
+        }
+
+        .bad-example, .good-example {
+            padding: 10px;
+            border-radius: 15px;
+            margin-bottom: 10px;
+        }
+
+        .bad-example {
+            background-color: #ffe8e8;
+            color: #d32f2f;
+        }
+
+        .good-example {
+            background-color: #e8f5e9;
+            color: #388e3c;
+        }
+
+        .dark-mode .bad-example {
+            background-color: #4a0000;
+            color: #ff9999;
+        }
+
+        .dark-mode .good-example {
+            background-color: #004d00;
+            color: #99ff99;
+        }
+
+        .settings-panel {
+            display: none;
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: #ffffff;
+            padding: 20px;
+            border-radius: 15px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            z-index: 1000;
+            width: 500px;
+            transition: opacity 0.3s, transform 0.3s;
+        }
+
+        .dark-mode .settings-panel {
+            background-color: #2a2a2a;
+            color: #ffffff;
+        }
+
+        .settings-item {
+            margin-bottom: 15px;
+        }
+
+        .settings-item label {
+            display: block;
+            margin-bottom: 5px;
+        }
+
+        .settings-item select, .settings-item input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+        }
+
+        .settings-item select {
+            background-color: #f0f2f5;
+        }
+
+        .dark-mode .settings-item select {
+            background-color: #333333;
+            color: #ffffff;
+            border-color: #ffffff;
+        }
+
+        .switch {
+            position: relative;
+            display: inline-block;
+            width: 100px;
+            height: 34px;
+        }
+
+        .switch input {
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+
+        .slider {
+            position: absolute;
+            cursor: pointer;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background-color: #ccc;
+            transition: .4s;
+            border-radius: 34px;
+        }
+
+        .slider:before {
+            position: absolute;
+            content: "";
+            height: 26px;
+            width: 26px;
+            left: 4px;
+            bottom: 4px;
+            background-color: white;
+            transition: .4s;
+            border-radius: 50%;
+        }
+
+        input:checked + .slider {
+            background-color: #0b3d91;
+        }
+
+        input:checked + .slider:before {
+            transform: translateX(66px);
+        }
+
+        .bot-avatar {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+
+        .main-content ul li.bot-message {
+            align-items: flex-start;
+            display: flex;
+        }
+
+        .bot-message-container {
+            display: flex;
+            align-items: flex-start;
+        }
+    </style>
+</head>
+<body>
+    <div class="wrapper">
+        <div class="sidebar">
+            <div class="sidebar-icon" id="new-chat">
+                <i class="fas fa-plus-circle"></i>
+                <span class="sidebar-text">New Chat</span>
+                <div class="tooltip">Start a new chat</div>
+            </div>
+            <div class="sidebar-icon" id="settings-icon">
+                <i class="fas fa-cog"></i>
+                <span class="sidebar-text">Settings</span>
+                <div class="tooltip">Adjust settings</div>
+            </div>
+        </div>
+        <div class="main">
+            <div class="main-header">
+                <img src="{{ url_for('static', filename='Huberlin-logo.png') }}" alt="Logo" class="logo">
+                <h1>HUBer Chat Bot</h1>
+            </div>
+            <div class="main-content">
+                <ul id="messages" class="list-group"></ul>
+            </div>
+            <form id="chat-form" class="input-form">
+                <input id="message" class="form-control" placeholder="Type your message here..." autocomplete="off" required>
+                <button class="btn btn-primary" type="submit">Send</button>
+            </form>
+        </div>
+    </div>
+
+    <button class="how-to-use-btn">How to Use</button>
+
+    <div class="how-to-use">
+        <span class="close-btn">&times;</span>
+        <h3>How to Use:</h3>
+        <div class="rule-cloud">Write your question in the input box.</div>
+        <div class="rule-cloud">Ensure your question is clear and concise.</div>
+        <div class="rule-cloud">Provide context and specific details when asking.</div>
+        <div class="rule-cloud">Please note that the chatbot is still learning! Double-check its answers.</div>
+        <div class="examples">
+            <p class="bad-example">Bad example: What is this?</p>
+            <p class="good-example">Good example: When is the semester break for winter semester 2024?</p>
+        </div>
+    </div>
+
+    <div class="contact-info">
+        <p>Questions, complaints, or suggestions? Contact: <strong>s.konchakova@student.hu-berlin.de</strong></p>
+    </div>
+
+    <div class="settings-panel" id="settings-panel">
+        <span class="close-btn" id="settings-close-btn">&times;</span>
+        <h3>Settings</h3>
+        <div class="settings-item">
+            <label for="darkModeToggle">Dark Mode</label>
+            <label class="switch">
+                <input type="checkbox" id="darkModeToggle">
+                <span class="slider"></span>
+            </label>
+        </div>
+        <div class="settings-item">
+            <label for="fontSizeSelect">Font Size</label>
+            <select id="fontSizeSelect">
+                <option value="small">Small</option>
+                <option value="medium" selected>Medium</option>
+                <option value="large">Large</option>
+            </select>
+        </div>
+    </div>
+
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/popper.js/1.16.0/umd/popper.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/js/bootstrap.min.js"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/4.1.3/socket.io.min.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            var socket = io.connect('http://' + document.domain + ':' + location.port);
+            var form = document.getElementById('chat-form');
+            var input = document.getElementById('message');
+            var messages = document.getElementById('messages');
+    
+            form.onsubmit = function(e) {
+                e.preventDefault();
+                appendUserMessage(input.value);
+                socket.send(input.value);
+                input.value = '';
+                showBotResponseAnimation();
+            };
+    
+            function showBotResponseAnimation() {
+                var botResponse = document.createElement('li');
+                botResponse.className = 'bot-response';
+                botResponse.innerHTML = `
+                    <span>Bot is typing</span>
+                    <div class="dots">
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                        <div class="dot"></div>
+                    </div>
+                `;
+                messages.appendChild(botResponse);
+                botResponse.scrollIntoView({behavior: "smooth"});
+            }
+    
+            socket.on('message', function(msg) {
+                // Remove the bot response animation
+                var botResponseAnimation = document.querySelector('.bot-response');
+                if (botResponseAnimation) {
+                    botResponseAnimation.remove();
+                }
+    
+                var message = document.createElement('li');
+                message.className = 'bot-message';
+                message.innerHTML = `
+                    <div class="bot-message-container">
+                        <img src="{{ url_for('static', filename='Huberlin-logo.png') }}" alt="Bot Avatar" class="bot-avatar">
+                        <div>
+                            <div class="message-content">
+                                <span>${msg}</span>
+                            </div>
+                            <div class="feedback">
+                                <i class="fas fa-thumbs-up"></i>
+                                <i class="fas fa-thumbs-down"></i>
+                            </div>
+                        </div>
+                    </div>
+                `;
+                messages.appendChild(message);
+                message.scrollIntoView({behavior: "smooth"});
+            });
+    
+            function appendUserMessage(msg) {
+                var message = document.createElement('li');
+                message.className = 'user-message';
+                message.innerHTML = `
+                    <div class="message-content">
+                        <span>${msg}</span>
+                    </div>
+                `;
+                messages.appendChild(message);
+                message.scrollIntoView({behavior: "smooth"});
+            }
+    
+            document.addEventListener('click', function(event) {
+                if (event.target.classList.contains('fa-thumbs-up') || event.target.classList.contains('fa-thumbs-down')) {
+                    var feedback = event.target.classList.contains('fa-thumbs-up') ? 'positive' : 'negative';
+                    event.target.classList.add('active');
+                    if (feedback === 'positive') {
+                        event.target.nextElementSibling.classList.remove('active');
+                    } else {
+                        event.target.previousElementSibling.classList.remove('active');
+                    }
+                    console.log('Feedback:', feedback); // Replace with actual feedback handling
+                }
+            });
+    
+            const howToUseBtn = document.querySelector('.how-to-use-btn');
+            const howToUse = document.querySelector('.how-to-use');
+            const closeBtn = document.querySelector('.close-btn');
+    
+            howToUseBtn.addEventListener('click', () => {
+                howToUse.style.display = 'block';
+            });
+    
+            closeBtn.addEventListener('click', () => {
+                howToUse.style.display = 'none';
+            });
+    
+            const newChatBtn = document.getElementById('new-chat');
+            newChatBtn.addEventListener('click', () => {
+                messages.innerHTML = '';
+                input.value = '';
+            });
+    
+            // Dark mode toggle
+            const settingsIcon = document.getElementById('settings-icon');
+            const settingsPanel = document.getElementById('settings-panel');
+    
+            settingsIcon.addEventListener('click', () => {
+                settingsPanel.style.display = settingsPanel.style.display === 'none' ? 'block' : 'none';
+            });
+    
+            const darkModeToggle = document.getElementById('darkModeToggle');
+            darkModeToggle.addEventListener('change', () => {
+                document.body.classList.toggle('dark-mode');
+            });
+    
+            // Close settings panel when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!settingsPanel.contains(event.target) && !settingsIcon.contains(event.target)) {
+                    settingsPanel.style.display = 'none';
+                }
+            });
+    
+            // Close settings panel with close button
+            const settingsCloseBtn = document.getElementById('settings-close-btn');
+            settingsCloseBtn.addEventListener('click', () => {
+                settingsPanel.style.display = 'none';
+            });
+    
+            // Font size change
+            const fontSizeSelect = document.getElementById('fontSizeSelect');
+            fontSizeSelect.addEventListener('change', (event) => {
+                document.body.style.fontSize = event.target.value === 'small' ? '12px' :
+                                              event.target.value === 'medium' ? '16px' : '20px';
+            });
+        });
+    </script>
+</body>
+</html>

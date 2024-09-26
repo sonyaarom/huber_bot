@@ -20,7 +20,7 @@ import dotenv
 MODEL_WEIGHTS_FILENAME = "mistral-7b-instruct-v0.1.Q3_K_M.gguf"
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
 INDEX_NAME = "data-management-example"
-LOGO_IMAGE = '/Users/s.konchakova/Thesis/img/hu-berlin-logo.png'
+#LOGO_IMAGE = '/Users/s.konchakova/Thesis/img/hu-berlin-logo.png'
 
 def initialise_session_state():
     if "messages" not in st.session_state:
@@ -30,7 +30,7 @@ def initialise_session_state():
         st.session_state.model = Model(model_path=weights_file, index_name=INDEX_NAME, pinecone_api_key=PINECONE_API_KEY)
 
 def app():
-    st.sidebar.image(LOGO_IMAGE, width=150, use_column_width=False)
+    #st.sidebar.image(LOGO_IMAGE, width=150, use_column_width=False)
     st.sidebar.title('How to Use')
     st.sidebar.markdown("""
         1. Write your question in the input box.
