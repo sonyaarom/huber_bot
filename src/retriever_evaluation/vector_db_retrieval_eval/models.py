@@ -2,6 +2,9 @@ from typing import List, Dict, Any
 from rank_bm25 import BM25Okapi
 from typing import List, Dict, Any, Tuple, Union
 from sentence_transformers import CrossEncoder
+import logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger(__name__)
 
 
 class BM25Vectorizer:
