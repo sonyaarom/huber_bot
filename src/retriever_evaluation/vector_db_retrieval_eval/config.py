@@ -6,12 +6,18 @@ load_dotenv()
 
 # API Configurations
 API_CONFIGS = {
+<<<<<<< HEAD
     "PROJECT_NAME": {
         "api_key": API_KEY,
         "default_embedding_model": "sentence-transformers/all-mpnet-base-v2"
     },
+=======
+    "": {
+        "api_key": '2966f5ad-7763-45be-a7ab-7c24afc01ff7',
+        "default_embedding_model": "all-MiniLM-L6-v2"
+>>>>>>> research_retriever
     
-}
+}}
 
 # File paths
 QA_DF_PATH = ''
