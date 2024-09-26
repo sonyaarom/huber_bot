@@ -61,27 +61,7 @@ Model Management:
 3. https://towardsai.net/p/machine-learning/evaluating-rag-metrics-across-different-retrieval-methods
 
 
-TODO: 13th September
-- remove duplicates from retrieved entities
-- create indexes for 3 embeddings and 4 lengths
-- test retriever: sparse, dense, hybrid
-- which similarity does hybrid support?
 
-
-TODO: 14th September
-- Parent chunk retriever? How to perform?
-- What are other possible retrievers?
-- Ensemble retriever chain?
-- Reranking?
-
-
-TODO: 16th September
-- Finish report for testing embeddings and retrievers
-
-TODO: 17th September
-- Clean the code for chunker, embeddings and upload
-- Git merge to the main 
-- CI/CD?
 
 TODO: 18th September
 - Prompt: what are the approaches?
