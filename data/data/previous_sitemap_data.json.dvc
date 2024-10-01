@@ -1,0 +1,5 @@
+outs:
+- md5: 88c0883392b15679f8f833fd7559a63e
+  size: 179657
+  hash: md5
+  path: previous_sitemap_data.json
