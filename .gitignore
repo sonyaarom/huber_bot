@@ -25,3 +25,4 @@ huber/
 TODO.md
 wandb/
 src/retriever_evaluation/vector_db_retrieval_eval/ignore.py
+old/

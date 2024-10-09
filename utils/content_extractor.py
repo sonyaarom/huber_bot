@@ -36,5 +36,6 @@ def add_extracted_content_to_df(df: pd.DataFrame) -> pd.DataFrame:
     
     df['extracted_title'] = extracted_data.apply(lambda x: x['title'])
     df['extracted_content'] = extracted_data.apply(lambda x: x['content'])
+    df['text'] =  df['extracted_title'] + " " + df['extracted_content'] 
     
     return df

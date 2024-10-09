@@ -9,6 +9,11 @@ from typing import Dict, List, Any
 from pinecone import Pinecone, PineconeException
 from tqdm import tqdm
 
+from typing import Dict, List, Any
+from tqdm import tqdm
+from pinecone import Pinecone, PineconeException
+import logging
+
 
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -76,12 +81,7 @@ def validate_vector(vector: List[float]) -> List[float]:
     Validate the vector, replacing NaN values with 0.
     """
     return np.nan_to_num(vector, nan=0.1).tolist()
-from typing import Dict, List, Any
-from tqdm import tqdm
-from pinecone import Pinecone, PineconeException
-import logging
 
-logger = logging.getLogger(__name__)
 
 def format_sparse_vector(sparse_dict: Dict[str, float]) -> Dict[str, List]:
     """
@@ -94,18 +94,35 @@ def format_sparse_vector(sparse_dict: Dict[str, float]) -> Dict[str, List]:
     values = list(sparse_dict.values())
     return {"indices": indices, "values": values}
 
-def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], pc: Pinecone, 
-                       embedding_model_name: str, doc_type: str, project_name: str, metric: str = 'cosine') -> None:
+
+def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], index_name: str,
+                       project_name: str, metric: str = 'cosine', host: str = None) -> None:
     """
-    Uploads document embeddings and sparse vectors to Pinecone indexes, configured for hybrid search.
-    """
-    logger.info(f"Starting upload process to Pinecone for {doc_type}-based documents in project {project_name} with metric: {metric}")
+    Uploads document embeddings and sparse vectors to an existing Pinecone index.
     
+    Args:
+    documents (Dict[int, List[Dict[str, Any]]]): Dictionary of documents to upload, keyed by chunk size.
+    index_name (str): Name of the Pinecone index.
+    project_name (str): Name of the project for metadata.
+    metric (str): Distance metric used by the index (default: 'cosine').
+    host (str): Host URL for the Pinecone index.
+
+    Returns:
+    None
+    """
+    logger.info(f"Starting upload process to Pinecone for project {project_name} with metric: {metric}")
+    # Access the existing index
+    try:
+        index = pinecone.Index(index_name)
+    except Exception as e:
+        logger.error(f"Error accessing index {index_name}: {str(e)}")
+        return
+
     for chunk_size, docs in documents.items():
         if not docs:
-            logger.warning(f"No documents found for {doc_type}-based, chunk size {chunk_size}. Skipping.")
+            logger.warning(f"No documents found for chunk size {chunk_size}. Skipping.")
             continue
-        
+
         # Validate and clean vectors
         cleaned_docs = []
         for doc in docs:
@@ -116,50 +133,20 @@ def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], pc: Pinecone,
                 cleaned_docs.append(cleaned_doc)
             except Exception as e:
                 logger.error(f"Error cleaning vector for document {doc.get('unique_id', 'unknown')}: {str(e)}")
-        
+
         if not cleaned_docs:
-            logger.warning(f"No valid documents after cleaning for {doc_type}-based, chunk size {chunk_size}. Skipping.")
+            logger.warning(f"No valid documents after cleaning for chunk size {chunk_size}. Skipping.")
             continue
-        
-        dimension = len(cleaned_docs[0]['values'])
-        index_name = f"{embedding_model_name.replace('_', '-')}-{doc_type}-dim{dimension}-b{chunk_size}"
-        
-        index, is_new = create_pinecone_index(pc, index_name, dimension, project_name, metric=metric)
-        
-        if index is None:
-            logger.error(f"Skipping processing for index {index_name} due to error.")
-            continue
-        
-        # Check for existing documents
-        existing_ids = set()
-        batch_size = 100
-        for i in range(0, len(cleaned_docs), batch_size):
-            batch = cleaned_docs[i:i+batch_size]
-            ids_to_check = [doc['unique_id'] for doc in batch]
-            try:
-                fetch_response = index.fetch(ids_to_check)
-                existing_ids.update(fetch_response.vectors.keys())
-            except PineconeException as e:
-                logger.error(f"Error checking existing documents in index {index_name}: {str(e)}")
-                break
-        
-        # Filter out existing documents
-        new_docs = [doc for doc in cleaned_docs if doc['unique_id'] not in existing_ids]
-        logger.info(f"Found {len(existing_ids)} existing documents. {len(new_docs)} new documents to upload.")
-        
-        if not new_docs:
-            logger.info(f"No new documents to upload for {doc_type}-based, chunk size {chunk_size}. Skipping.")
-            continue
-        
+
+        # Prepare vectors to upsert
         vectors_to_upsert = []
-        for doc in new_docs:
+        for doc in cleaned_docs:
             vector = {
                 'id': doc['unique_id'],
                 'values': doc['values'],
                 'metadata': {
-                    **doc['metadata'],
+                    **doc.get('metadata', {}),
                     "chunk_size": chunk_size,
-                    "doc_type": doc_type,
                     "project": project_name
                 }
             }
@@ -167,18 +154,79 @@ def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], pc: Pinecone,
             if 'sparse_values' in doc and doc['sparse_values']:
                 vector['sparse_values'] = format_sparse_vector(doc['sparse_values'])
             vectors_to_upsert.append(vector)
-        
+
+        # Upsert vectors in batches
+        batch_size = 100
+        total_uploaded = 0
         for i in tqdm(range(0, len(vectors_to_upsert), batch_size), desc=f"Uploading to {index_name}"):
             batch = vectors_to_upsert[i:i+batch_size]
             try:
                 index.upsert(vectors=batch)
-            except PineconeException as e:
-                logger.error(f"Error upserting to index {index_name}: {str(e)}")
+                total_uploaded += len(batch)
+            except Exception as e:
+                logger.error(f"Error upserting batch to index {index_name}: {str(e)}")
+                logger.info(f"Successfully uploaded {total_uploaded} documents before error occurred.")
                 break
         else:
-            logger.info(f"Successfully uploaded {len(new_docs)} new documents to index '{index_name}'")
-    
+            logger.info(f"Successfully uploaded all {total_uploaded} documents to index '{index_name}'")
+
     logger.info("Upload process completed.")
+
+
+
+def prepare_documents_for_upload(documents: List[Dict[str, Any]], chunk_size: int, doc_type: str, project_name: str) -> List[Dict[str, Any]]:
+    """
+    Prepares documents for upload by creating a structure similar to what's used in upload_to_pinecone.
+    
+    Args:
+    documents (List[Dict[str, Any]]): List of document dictionaries.
+    chunk_size (int): Size of the chunk for these documents.
+    doc_type (str): Type of the document (e.g., 'text', 'recursive').
+    project_name (str): Name of the project.
+
+    Returns:
+    List[Dict[str, Any]]: List of prepared documents ready for upload.
+    """
+    logger.info(f"Preparing {len(documents)} documents for upload. Chunk size: {chunk_size}, Doc type: {doc_type}, Project: {project_name}")
+
+    prepared_docs = []
+
+    for doc in tqdm(documents, desc="Preparing documents"):
+        try:
+            # Validate and clean vector
+            cleaned_vector = validate_vector(doc.get('values', []))
+
+            # Prepare the document structure
+            prepared_doc = {
+                'id': doc.get('unique_id', ''),
+                'values': cleaned_vector,
+                'metadata': {
+                    'url': doc.get('url', ''),
+                    'last_updated': doc.get('last_updated', ''),
+                    'text': doc.get('text', ''),
+                    'chunk_size': chunk_size,
+                    'doc_type': doc_type,
+                    'project': project_name
+                }
+            }
+
+            # Add any additional metadata fields
+            for key, value in doc.items():
+                if key not in ['unique_id', 'values', 'url', 'last_updated', 'text']:
+                    prepared_doc['metadata'][key] = value
+
+            # Format and add sparse values if they exist
+            if 'sparse_values' in doc and doc['sparse_values']:
+                prepared_doc['sparse_values'] = format_sparse_vector(doc['sparse_values'])
+
+            prepared_docs.append(prepared_doc)
+
+        except Exception as e:
+            logger.error(f"Error preparing document {doc.get('unique_id', 'unknown')}: {str(e)}")
+
+    logger.info(f"Successfully prepared {len(prepared_docs)} documents for upload")
+
+    return prepared_docs
 
 def delete_index(pc: Pinecone, index_name: str) -> bool:
     """

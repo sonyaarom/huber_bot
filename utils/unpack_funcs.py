@@ -32,11 +32,3 @@ def unzip_file(file_path):
     except Exception as e:
         logging.error(f"Error unzipping file: {e}")
         raise
-
-
-file = download_file('https://www.wiwi.hu-berlin.de/sitemap.xml.gz')
-
-if __name__ == "__main__":
-    file_path = file
-    content = unzip_file(file_path)
-    print(content[:100])  
