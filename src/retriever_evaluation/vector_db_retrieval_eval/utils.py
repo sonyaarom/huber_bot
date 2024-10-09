@@ -2,7 +2,9 @@ import json
 from sentence_transformers import SentenceTransformer
 from typing import List, Dict, Any, Tuple, Callable, Optional
 from collections import defaultdict
+import logging
 
+logger = logging.getLogger(__name__)
 
 
 def load_bm25_values(file_path: str) -> dict:
@@ -227,48 +229,18 @@ def calculate_hit_at_k(question_id: str, general_ids: List[str], k: int) -> int:
     return int(question_id in general_ids[:k])
 
 
+
+
 def generate_sparse_vector(query: str, bm25_values: dict) -> Dict[str, Any]:
     """
     Generate a sparse vector representation of a query using BM25 scoring.
-
-    This function creates a sparse vector for a given query based on pre-computed BM25 values.
-    It uses the BM25 algorithm, which is a ranking function used by search engines to rank
-    matching documents according to their relevance to a given search query.
-
-    Args:
-        query (str): The input query string.
-        bm25_values (dict): A dictionary containing pre-computed BM25 values, including:
-            - 'vocabulary': List of terms in the corpus vocabulary.
-            - 'idf': Dict of inverse document frequency values for each term.
-            - 'k1': BM25 parameter for term frequency scaling.
-            - 'b': BM25 parameter for length normalization.
-            - 'avgdl': Average document length in the corpus.
-
-    Returns:
-        Dict[str, Any]: A dictionary containing:
-            - 'indices': List of indices (positions) of non-zero elements in the sparse vector.
-            - 'values': List of corresponding non-zero values.
-
-    Example:
-        query = "information retrieval"
-        bm25_values = {
-            'vocabulary': ['information', 'retrieval', 'system', ...],
-            'idf': {'information': 1.5, 'retrieval': 2.0, ...},
-            'k1': 1.2,
-            'b': 0.75,
-            'avgdl': 20
-        }
-        sparse_vector = generate_sparse_vector(query, bm25_values)
-
-    Note:
-        - The function uses the BM25 scoring formula to calculate the weight of each term.
-        - Terms not present in the query will have a score of 0 and are omitted from the output.
-        - This sparse representation is efficient for large vocabularies where most terms
-          in a given query have zero weight.
-        - The resulting sparse vector can be used in hybrid search systems or for
-          efficient similarity computations.
     """
+    logger.info(f"Generating sparse vector for query: '{query}'")
+    logger.info(f"BM25 values keys: {bm25_values.keys()}")
+    
     query_terms = query.lower().split()
+    logger.info(f"Query terms: {query_terms}")
+    
     vector = {}
     for i, term in enumerate(bm25_values['vocabulary']):
         if term in query_terms:
@@ -279,10 +251,20 @@ def generate_sparse_vector(query: str, bm25_values: dict) -> Dict[str, Any]:
             
             numerator = tf * (k1 + 1)
             denominator = tf + k1 * (1 - b + b * len(query_terms) / avgdl)
-            vector[i] = idf * (numerator / denominator)
+            score = idf * (numerator / denominator)
+            
+            vector[i] = score
+            logger.info(f"Term: '{term}', TF: {tf}, IDF: {idf}, Score: {score}")
+        else:
+            logger.debug(f"Term '{term}' not in query")
     
-    return {"indices": list(vector.keys()), "values": list(vector.values())}
-
+    result = {"indices": list(vector.keys()), "values": list(vector.values())}
+    logger.info(f"Generated sparse vector: indices count: {len(result['indices'])}, values count: {len(result['values'])}")
+    if not result['indices']:
+        logger.warning("Generated sparse vector is empty!")
+        logger.info(f"Query terms not found in vocabulary: {set(query_terms) - set(bm25_values['vocabulary'])}")
+    
+    return result
 
 def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[str, List[str]]:
     """

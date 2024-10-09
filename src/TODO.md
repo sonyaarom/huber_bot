@@ -9,20 +9,6 @@
 6. How to update Pinecone?
 --------
 
-7. How to improve retriever?:
-    7.1. Retriever sentence based+
-    7.2. Retriever token based+
-    7.3. Semantic Retriever+
-Named Entity Recognition+
-
-8. How to store data better? Meta tags? Entity detection?
-
-#semantic based, token based and sentence based
-#NER
-#embedding models
-#
-
-
 --------
 Literature:
 1. Jiang et al., (2023) [5] introduce FLARE (Forward-Looking Active Retrieval Augmented Generation), a novel method designed to enhance RAG systems. :
@@ -59,6 +45,7 @@ Model Management:
 1.Gao et al.’s [12] 
 2. https://medium.com/@bijit211987/strategies-for-optimal-performance-of-rag-6faa1b79cd45
 3. https://towardsai.net/p/machine-learning/evaluating-rag-metrics-across-different-retrieval-methods
+4. https://arxiv.org/pdf/2309.03409
 
 
 

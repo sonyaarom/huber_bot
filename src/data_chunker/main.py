@@ -42,12 +42,12 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
 from shared_utils import get_embeddings, embed_dataframe
 #options for encode model = "all-MiniLM-L6-v2" or "hf", 'Snowflake/snowflake-arctic-embed-l' 
 
-def main(chunk_types: List[str] = ['recursive', 'char'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
+def main(chunk_types: List[str] = ['recursive'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
         load_dotenv()
         
         df_path = os.path.join(assets_dir, 'csv', 'data_subset.csv')
-        chunk_sizes = [128, 256, 512] 
+        chunk_sizes = [256] 
         if embed_model_name == None:
             embed_model_name = encode_model
 

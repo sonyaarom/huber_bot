@@ -88,63 +88,74 @@ class BM25Vectorizer:
         return {"indices": indices, "values": values}
     
 
+logger = logging.getLogger(__name__)
+import logging
+from typing import List, Dict, Any, Tuple
+
+logger = logging.getLogger(__name__)
+
 class PineconeWrapper:
-    """
-    A wrapper class for performing hybrid and dense vector searches using Pinecone.
-
-    This class provides an interface to perform both hybrid (dense + sparse) and dense-only
-    vector searches on a Pinecone index. It handles the complexities of querying Pinecone
-    and provides error logging for debugging purposes.
-
-    Attributes:
-        index: A Pinecone index object used for querying.
-
-    Example:
-        pinecone_index = Pinecone.Index("my-index")
-        wrapper = PineconeWrapper(pinecone_index)
-        results = wrapper.hybrid_search(dense_vec, sparse_vec, k=10)
-    """
-
     def __init__(self, index):
-        """
-        Initialize the PineconeWrapper with a Pinecone index.
-
-        Args:
-            index: A Pinecone index object to be used for queries.
-        """
         self.index = index
+
+    def flexible_hybrid_search(self, dense_vec: List[float], sparse_vec: Dict[str, List[Any]],
+                               k: int, filter_dict: Dict[str, Any] = None,
+                               use_parent_chunk_retriever: bool = False,
+                               max_chunks_per_id: int = 10) -> List[Dict[str, Any]]:
+        try:
+            if not sparse_vec or not sparse_vec['indices']:
+                logger.info("Performing dense search due to empty sparse vector")
+                initial_results = self.dense_search(dense_vec, k, filter_dict)
+            else:
+                logger.info("Performing hybrid search")
+                initial_results = self.hybrid_search(dense_vec, sparse_vec, k, filter_dict)
+
+            if not initial_results:
+                logger.warning("No results found in initial search")
+                return []
+
+            if not use_parent_chunk_retriever:
+                logger.info("Parent chunk retriever not used, returning initial results")
+                return [{'id': item[0].metadata.get('id', ''), 'score': item[1], 'metadata': item[0].metadata} for item in initial_results]
+
+            all_chunks = []
+            for item in initial_results:
+                general_id = item[0].metadata.get('general_id')
+                if general_id:
+                    chunk_results = self.dense_search(dense_vec, max_chunks_per_id, {"general_id": {"$eq": general_id}})
+                    all_chunks.extend(chunk_results)
+
+            if not all_chunks:
+                logger.warning("No chunks found for parent chunk retrieval")
+                return [{'id': item[0].metadata.get('id', ''), 'score': item[1], 'metadata': item[0].metadata} for item in initial_results]
+
+            # Group chunks by general_id
+            grouped_results = {}
+            for chunk in all_chunks:
+                general_id = chunk[0].metadata.get('general_id')
+                if general_id not in grouped_results:
+                    grouped_results[general_id] = {
+                        'id': general_id,
+                        'score': chunk[1],
+                        'metadata': chunk[0].metadata,
+                        'chunks': []
+                    }
+                grouped_results[general_id]['chunks'].append({
+                    'id': chunk[0].metadata.get('id', ''),
+                    'score': chunk[1],
+                    'metadata': chunk[0].metadata
+                })
+
+            # Sort grouped results by the highest chunk score and return top k
+            sorted_results = sorted(grouped_results.values(), key=lambda x: x['score'], reverse=True)[:k]
+            return sorted_results
+
+        except Exception as e:
+            logger.error(f"Error in flexible_hybrid_search: {str(e)}")
+            return []  # Return an empty list instead of None
 
     def hybrid_search(self, dense_vec: List[float], sparse_vec: Dict[str, List[Any]], 
                       k: int, filter_dict: Dict[str, Any] = None) -> List[Tuple[Any, float]]:
-        """
-        Perform a hybrid search using both dense and sparse vectors.
-
-        This method combines dense and sparse vector representations to perform
-        a hybrid search on the Pinecone index.
-
-        Args:
-            dense_vec (List[float]): The dense vector representation of the query.
-            sparse_vec (Dict[str, List[Any]]): The sparse vector representation of the query.
-                                               Should contain 'indices' and 'values' keys.
-            k (int): The number of top results to return.
-            filter_dict (Dict[str, Any], optional): A filter to apply to the search.
-
-        Returns:
-            List[Tuple[Any, float]]: A list of tuples, each containing:
-                - An object with a 'metadata' attribute containing the item's metadata.
-                - The score of the item.
-
-        Raises:
-            Exception: If an error occurs during the search process.
-
-        Note:
-            - If the sparse vector is empty, a default sparse vector is used to avoid errors.
-            - Errors are logged for debugging purposes before being re-raised.
-        """
-        if not sparse_vec['indices']:
-            sparse_vec['indices'] = [0]
-            sparse_vec['values'] = [0.0]
-        
         try:
             results = self.index.query(
                 vector=dense_vec,
@@ -156,35 +167,10 @@ class PineconeWrapper:
             return [(type('obj', (), {'metadata': item.metadata})(), item.score) for item in results.matches]
         except Exception as e:
             logger.error(f"Error in hybrid_search: {str(e)}")
-            logger.error(f"Dense vector: {dense_vec[:5]}... (length: {len(dense_vec)})")
-            logger.error(f"Sparse vector indices: {sparse_vec['indices']}")
-            logger.error(f"Sparse vector values: {sparse_vec['values']}")
-            raise
+            return []
 
     def dense_search(self, dense_vec: List[float], k: int, 
                      filter_dict: Dict[str, Any] = None) -> List[Tuple[Any, float]]:
-        """
-        Perform a dense vector search.
-
-        This method uses only the dense vector representation to perform
-        a search on the Pinecone index.
-
-        Args:
-            dense_vec (List[float]): The dense vector representation of the query.
-            k (int): The number of top results to return.
-            filter_dict (Dict[str, Any], optional): A filter to apply to the search.
-
-        Returns:
-            List[Tuple[Any, float]]: A list of tuples, each containing:
-                - An object with a 'metadata' attribute containing the item's metadata.
-                - The score of the item.
-
-        Raises:
-            Exception: If an error occurs during the search process.
-
-        Note:
-            - Errors are logged for debugging purposes before being re-raised.
-        """
         try:
             results = self.index.query(
                 vector=dense_vec,
@@ -195,8 +181,7 @@ class PineconeWrapper:
             return [(type('obj', (), {'metadata': item.metadata})(), item.score) for item in results.matches]
         except Exception as e:
             logger.error(f"Error in dense_search: {str(e)}")
-            logger.error(f"Dense vector: {dense_vec[:5]}... (length: {len(dense_vec)})")
-            raise
+            return []
 
 
 

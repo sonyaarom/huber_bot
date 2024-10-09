@@ -1,55 +1,58 @@
 import traceback
-from typing import Dict, List, Any, Tuple
+from typing import Dict, List, Any, Tuple, Callable, Union
 import pandas as pd
 from pinecone import Pinecone
 import wandb
 from config import API_CONFIGS
 from utils import get_embedding_model, convert_question_to_vector, generate_sparse_vector, hybrid_scale, create_complex_filter, calculate_mrr, calculate_hit_at_k
 from models import PineconeWrapper
-
-
-def rerank_results(question: str, search_results: List[Tuple[Any, float]], reranker_model: Any, final_k: int) -> List[Tuple[Any, float]]:
-    """
-    Rerank the search results using the provided reranker model.
-    
-    Args:
-    question (str): The original question.
-    search_results (List[Tuple[Any, float]]): The initial search results.
-    reranker_model (Any): The reranker model to use.
-    final_k (int): The number of top results to return after reranking.
-    
-    Returns:
-    List[Tuple[Any, float]]: The reranked results.
-    """
-    logger.info(f"Reranking results for question: '{question}'")
-    logger.info(f"Number of results to rerank: {len(search_results)}")
-    
-    passages = [result[0].metadata['text'] for result in search_results]
-    
-    logger.info("Sample of passages to rerank:")
-    for i, passage in enumerate(passages[:3]):  # Log first 3 passages
-        logger.info(f"Passage {i + 1}: {passage[:100]}...")  # Log first 100 chars of each passage
-    
-    reranked_scores = reranker_model.rerank(query=question, passages=passages)
-    
-    logger.info("Sample of reranked scores:")
-    for i, score in enumerate(reranked_scores[:5]):  # Log first 5 scores
-        logger.info(f"Score {i + 1}: {score}")
-    
-    reranked_results = [(search_results[i][0], score) for i, score in enumerate(reranked_scores)]
-    reranked_results.sort(key=lambda x: x[1], reverse=True)
-    
-    logger.info(f"Number of results after reranking: {len(reranked_results[:final_k])}")
-    
-    return reranked_results[:final_k]
-
-
 import time
 import logging
 from typing import Any, Callable, Dict, List
 import pandas as pd
 
 logger = logging.getLogger(__name__)
+
+def rerank_results(question: str, search_results: List[Union[Dict[str, Any], Any]], reranker_model: Any, final_k: int) -> List[Dict[str, Any]]:
+    """
+    Rerank the search results using the provided reranker model.
+    """
+    logger.info(f"Reranking results for question: '{question}'")
+    logger.info(f"Number of results to rerank: {len(search_results)}")
+    
+    def get_result_info(result: Union[Dict, Any]) -> Tuple[str, float, Dict]:
+        if isinstance(result, dict):
+            return result.get('id', 'N/A'), result.get('score', 0), result.get('metadata', {})
+        elif hasattr(result, 'metadata'):
+            return getattr(result, 'id', 'N/A'), getattr(result, 'score', 0), result.metadata
+        elif isinstance(result, tuple) and len(result) >= 2:
+            return getattr(result[0], 'id', 'N/A'), result[1], getattr(result[0], 'metadata', {})
+        else:
+            logger.warning(f"Unexpected result type: {type(result)}")
+            return 'N/A', 0, {}
+
+    # Extract passages for reranking
+    passages = []
+    for result in search_results:
+        _, _, metadata = get_result_info(result)
+        passages.append(metadata.get('text', ''))
+    
+    # Rerank passages
+    reranked_scores = reranker_model.rerank(question, passages)
+    
+    # Combine original results with new scores
+    reranked_results = []
+    for result, new_score in zip(search_results, reranked_scores):
+        result_id, _, metadata = get_result_info(result)
+        reranked_results.append({
+            'id': result_id,
+            'score': new_score,
+            'metadata': metadata
+        })
+    
+    # Sort by new scores and return top final_k
+    reranked_results.sort(key=lambda x: x['score'], reverse=True)
+    return reranked_results[:final_k]
 
 def evaluate_retriever(qa_df: pd.DataFrame, 
                        docsearch: Any, 
@@ -60,17 +63,14 @@ def evaluate_retriever(qa_df: pd.DataFrame,
                        use_ner: bool = False,
                        reranker_model: Any = None, 
                        initial_k: int = 10, 
-                       final_k: int = 5) -> Dict[str, Any]:
+                       final_k: int = 5,
+                       use_parent_chunk_retriever: bool = False,
+                       max_chunks_per_id: int = None) -> Dict[str, Any]:
     """
     Evaluate the performance of a retriever system on a question-answering dataset.
 
-    This function processes a dataset of questions, retrieves relevant documents using
-    a specified search method (dense or hybrid), optionally applies reranking, and
-    calculates various performance metrics.
-
     Args:
         qa_df (pd.DataFrame): DataFrame containing questions, their IDs, and optionally, entities.
-                              Expected columns: ['question', 'id', 'entities' (if use_ner is True)]
         docsearch (Any): An object (like PineconeWrapper) that provides search functionality.
         convert_question_to_vector (Callable[[str], List[float]]): Function to convert questions to dense vectors.
         bm25_values (dict): BM25 values for sparse vector generation. Used only if alpha < 1.
@@ -80,6 +80,8 @@ def evaluate_retriever(qa_df: pd.DataFrame,
         reranker_model (Any, optional): Model for reranking results. If None, no reranking is applied.
         initial_k (int, optional): Number of initial results to retrieve. Defaults to 10.
         final_k (int, optional): Number of results to keep after reranking. Defaults to 5.
+        use_parent_chunk_retriever (bool, optional): Whether to use parent chunk retriever. Defaults to False.
+        max_chunks_per_id (int, optional): Maximum number of chunks to retrieve per parent. Used only if use_parent_chunk_retriever is True.
 
     Returns:
         Dict[str, Any]: A dictionary containing the following metrics:
@@ -89,25 +91,15 @@ def evaluate_retriever(qa_df: pd.DataFrame,
 
     Raises:
         Exception: Any exception during processing of individual questions is caught and logged.
-
-    Notes:
-        - The function logs detailed information about each question's processing and results.
-        - It supports both dense and hybrid (dense + sparse) search methods.
-        - NER can be used for filtering if 'entities' column is present in qa_df and use_ner is True.
-        - Reranking is applied if a reranker_model is provided.
-
-    Example:
-        results = evaluate_retriever(qa_df, pinecone_wrapper, embed_question, bm25_values,
-                                     k_values=[1, 5, 10], alpha=0.7, use_ner=True,
-                                     reranker_model=cross_encoder, initial_k=20, final_k=10)
-        print(f"MRR: {results['MRR']}")
-        print(f"Average Retrieval Time: {results['Avg Retrieval Time']} seconds")
-        print(f"Hit@k: {results['HitatK']}")
     """
     total_mrr = 0
     total_retrieval_time = 0
     hit_at_k = {k: 0 for k in k_values}
     num_questions = len(qa_df)
+
+    logger.info(f"Starting evaluation with {num_questions} questions")
+    logger.info(f"Configuration - Alpha: {alpha}, Use NER: {use_ner}, Use Parent Chunk Retriever: {use_parent_chunk_retriever}")
+    logger.info(f"Initial K: {initial_k}, Final K: {final_k}")
 
     for _, row in qa_df.iterrows():
         question = row['question']
@@ -118,33 +110,87 @@ def evaluate_retriever(qa_df: pd.DataFrame,
             start_time = time.time()
             dense_vec = convert_question_to_vector(question)
             
-            if alpha < 1 and bm25_values:
+            logger.info(f"Processing question: '{question}'")
+            logger.info(f"Question ID: {question_id}")
+            logger.info(f"Alpha value: {alpha}")
+            logger.info(f"BM25 values available: {bm25_values is not None}")
+            
+            use_hybrid = alpha < 1 and bm25_values is not None
+            logger.info(f"Using hybrid search: {use_hybrid}")
+            
+            if use_hybrid:
+                logger.info("Generating sparse vector")
                 sparse_vec = generate_sparse_vector(question, bm25_values)
-                dense_vec, sparse_vec = hybrid_scale(dense_vec, sparse_vec, alpha)
+                if sparse_vec['indices']:
+                    logger.info(f"Sparse vector generated successfully. Non-zero elements: {len(sparse_vec['indices'])}")
+                    dense_vec, sparse_vec = hybrid_scale(dense_vec, sparse_vec, alpha)
+                    logger.info(f"Vectors scaled with alpha={alpha}")
+                else:
+                    logger.info("Sparse vector is empty, falling back to dense search")
+                    use_hybrid = False
+                    sparse_vec = None
             else:
+                logger.info("Skipping sparse vector generation")
                 sparse_vec = None
 
             filter_dict = create_complex_filter(entities) if use_ner else None
-            logger.info(f"Processing question: '{question}'")
             logger.info(f"Entities: {entities}")
             logger.info(f"Filter: {filter_dict}")
             
-            if sparse_vec:
+            if use_parent_chunk_retriever:
+                logger.info("Using parent chunk retriever")
+                search_results = docsearch.flexible_hybrid_search(
+                    dense_vec=dense_vec,
+                    sparse_vec=sparse_vec,
+                    k=initial_k,
+                    filter_dict=filter_dict,
+                    use_parent_chunk_retriever=True,
+                    max_chunks_per_id=max_chunks_per_id
+                )
+            elif use_hybrid:
+                logger.info("Performing hybrid search")
                 search_results = docsearch.hybrid_search(dense_vec, sparse_vec, k=initial_k, filter_dict=filter_dict)
             else:
+                logger.info("Performing dense search")
                 search_results = docsearch.dense_search(dense_vec, k=initial_k, filter_dict=filter_dict)
             
+            if not search_results:
+                logger.warning(f"No results found for question: '{question}'")
+                continue
+
             logger.info(f"Number of results before reranking: {len(search_results)}")
             logger.info("Top 3 results before reranking:")
             for i, result in enumerate(search_results[:3]):
-                logger.info(f"Result {i + 1}: ID = {result[0].metadata['general_id']}, Score = {result[1]}")
+                result_id = result.get('id') if isinstance(result, dict) else result[0].metadata.get('general_id', 'N/A')
+                result_score = result.get('score') if isinstance(result, dict) else result[1]
+                logger.info(f"Result {i + 1}: ID = {result_id}, Score = {result_score}")
             
             if reranker_model:
                 logger.info("Applying reranking...")
-                search_results = rerank_results(question, search_results, reranker_model, final_k)
+                if use_parent_chunk_retriever:
+                    # Flatten the chunks for reranking
+                    flattened_results = []
+                    for result in search_results:
+                        for chunk in result.get('chunks', []):
+                            flattened_results.append((chunk, chunk.get('score', 0)))
+                    reranked_results = rerank_results(question, flattened_results, reranker_model, final_k)
+                    # Reconstruct the parent structure
+                    search_results = [
+                        {
+                            'id': result['id'],
+                            'score': max((chunk.get('score', 0) for chunk in result.get('chunks', [])), default=0),
+                            'metadata': result.get('metadata', {}),
+                            'chunks': sorted(result.get('chunks', []), key=lambda x: x.get('score', 0), reverse=True)[:final_k]
+                        }
+                        for result in search_results
+                    ]
+                else:
+                    reranked_results = rerank_results(question, search_results, reranker_model, final_k)
+                    search_results = [{'id': r[0], 'score': r[1], 'metadata': r[0].metadata} for r in reranked_results]
+                
                 logger.info("Top 3 results after reranking:")
                 for i, result in enumerate(search_results[:3]):
-                    logger.info(f"Result {i + 1}: ID = {result[0].metadata['general_id']}, Score = {result[1]}")
+                    logger.info(f"Result {i + 1}: ID = {result['id']}, Score = {result['score']}")
             else:
                 logger.info("Reranker not applied. Truncating to final_k results.")
                 search_results = search_results[:final_k]
@@ -153,7 +199,8 @@ def evaluate_retriever(qa_df: pd.DataFrame,
             retrieval_time = end_time - start_time
             total_retrieval_time += retrieval_time
 
-            general_ids = [item[0].metadata['general_id'] for item in search_results]
+            general_ids = [result['id'] for result in search_results]
+
             _, reciprocal_rank = calculate_mrr(question_id, general_ids)
             total_mrr += reciprocal_rank
 
@@ -184,8 +231,6 @@ def evaluate_retriever(qa_df: pd.DataFrame,
         "HitatK": avg_hit_at_k
     }
 
-
-
 def test_all_pinecone_indexes(qa_df: pd.DataFrame, 
                               bm25_values: dict, 
                               k_values: List[int] = [1, 3, 5], 
@@ -198,7 +243,9 @@ def test_all_pinecone_indexes(qa_df: pd.DataFrame,
                               api_configs: Dict[str, Dict[str, Any]] = None,
                               get_embedding_model: Callable = None,
                               convert_question_to_vector: Callable = None,
-                              pinecone_wrapper_class: Any = None) -> Dict[str, Any]:
+                              pinecone_wrapper_class: Any = None,
+                              use_parent_chunk_retriever: bool = False,
+                              max_chunks_per_id: int = None) -> Dict[str, Any]:
     """
     Evaluate retrieval performance across multiple Pinecone indexes and configurations.
 
@@ -280,8 +327,10 @@ def test_all_pinecone_indexes(qa_df: pd.DataFrame,
                         print(f"Evaluating with alpha = {alpha}")
                         index_results = evaluate_retriever(qa_df, docsearch, local_convert_question_to_vector, 
                                                            bm25_values, k_values, alpha, use_ner, reranker_model,
-                                                           initial_k=initial_k, final_k=final_k)
-                        result_key = f"{api_key_name}_{index_name}_alpha{alpha}_ner{use_ner}_reranker{reranker_model is not None}"
+                                                           initial_k=initial_k, final_k=final_k,
+                                                           use_parent_chunk_retriever=use_parent_chunk_retriever,
+                                                           max_chunks_per_id=max_chunks_per_id)
+                        result_key = f"{api_key_name}_{index_name}_alpha{alpha}_ner{use_ner}_reranker{reranker_model is not None}_pcr{use_parent_chunk_retriever}"
                         all_results[result_key] = index_results
 
                         wandb.log({
