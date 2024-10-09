@@ -24,6 +24,9 @@ def get_overlap(chunk_length: int) -> int:
     
 
 def convert_entities_to_label_name_dict(entities):
+    """
+    Converts a list of entity dictionaries into a dictionary where each label has a set of entity texts.
+    """
     label_name_dict = defaultdict(set)  # Use a set instead of a list
 
     for entity in entities:
@@ -51,6 +54,9 @@ def chunk_text(text: str, chunk_size: int, overlap: int, encoding) -> List[str]:
     return chunks
 
 def process_data_tokens_tiktoken(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str,  bm25_values: dict) -> List[Tuple[int, int, int, float, float]]:
+    """
+    Processes the data by chunking, embedding, and generating documents using the token-based approach.
+    """
     chunk_stats = []
     encoding = tiktoken.get_encoding("cl100k_base")
 

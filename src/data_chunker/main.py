@@ -40,7 +40,7 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
         logger.info(f"    Median length = {median_length:.2f}")
 
 from shared_utils import get_embeddings, embed_dataframe
-#options for encode model = "all-MiniLM-L6-v2" or "hf", 'Snowflake/snowflake-arctic-embed-l' 
+#Example options for encode model: "all-MiniLM-L6-v2", "hf", 'Snowflake/snowflake-arctic-embed-l' 
 
 def main(chunk_types: List[str] = ['recursive'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
@@ -59,6 +59,7 @@ def main(chunk_types: List[str] = ['recursive'], encode_model: str = "all-MiniLM
 
         logger.info(f"Loading DataFrame from {df_path}")
         df = pd.read_csv(df_path)
+        df = df.sample(10)
         logger.info(f"DataFrame loaded with {len(df)} rows")
         # Drop rows with NA values in the 'text' column
         initial_row_count = len(df)

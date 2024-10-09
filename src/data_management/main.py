@@ -4,7 +4,9 @@ import boto3
 import json
 from datetime import datetime
 import pandas as pd
+import logging
 
+logger = logging.getLogger(__name__)
 
 sys.path.append('/Users/s.konchakova/Thesis/huber_bot/src')
 sys.path.append('/Users/s.konchakova/Thesis/huber_bot/utils')
@@ -34,32 +36,18 @@ def main():
     print(f"Safe entries: {safe}")
     print(f"Unsafe entries: {unsafe}")
     
-    # S3 configuration
-    bucket_name = 'huber-chatbot-project'
-    s3_key_prefix = f'sitemap_data/sitemap_data_{datetime.now().strftime("%Y")}.json'
-    
-    # Convert data_dict to JSON string
-    #json_data = json.dumps(data_dict)
-
-    #create a slice
-    
-    # Upload JSON data to S3
-    # if bucket_name:
-    #     s3 = boto3.client('s3')
-    #     s3.put_object(Body=json_data, Bucket=bucket_name, Key=s3_key_prefix)
-    #     print(f"Data uploaded to S3 bucket: {bucket_name}")
-    #     print(f"S3 key: {s3_key_prefix}")
-    
     # Process the data
     df = pd.DataFrame.from_dict(data_dict, orient='index').reset_index()
     df.columns = ['id', 'url', 'last_updated']
+
+    # df = df.head(10)
     
     # Add HTML content to the DataFrame
     df = add_html_content_to_df(df)
     
     # Extract and add content to the DataFrame
-    df = add_extracted_content_to_df(df)
-
+    df = add_extracted_content_to_df(df, skip_invalid = True)
+    logger.info(f"Final DataFrame size after extraction: {df.size}")
     #save to csv
     df.to_csv('assets/csv/data_subset.csv', index=False)
 

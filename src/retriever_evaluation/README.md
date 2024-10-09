@@ -137,6 +137,11 @@ The Vector DB Retrieval Evaluation component uses Weights & Biases (wandb) for l
 
 The Question Generation and Evaluation component logs its progress and results to the console and saves the evaluated questions with scores to a CSV file.
 
+
+## Results of the evaluation in a form of a WandB Report for HUBer Project:
+1. [Step I: Retriever Evaluation - Experimentation with Chunk Sizes, Embeddings and Chunking Methods](https://wandb.ai/konchakova-s-r-humboldt-universit-t-zu-berlin/pinecone_index_evaluation/reports/Step-I-Retriever-Evaluation-Experimentation-with-Chunk-Sizes-Embeddings-and-Chunking-Methods--Vmlldzo5MzA3ODM4)
+2. [Step II: Retriever Evaluation Experimentation with Dense, Sparse and Hybrid Retrievers and NER](https://wandb.ai/konchakova-s-r-humboldt-universit-t-zu-berlin/pinecone_index_evaluation/reports/Step-II-Retriever-Evaluation-Experimentation-with-Dense-Sparse-and-Hybrid-Retrievers-and-NER--Vmlldzo5NDgxMTc4)
+
 ---
 
 For any questions or issues, please open an issue on the GitHub repository or contact the project maintainers.

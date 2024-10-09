@@ -15,6 +15,9 @@ ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
 labels = ["person", "course", "date",  "research_project", "address", "organisation", "phone_number", "url", "other"]
 
 def get_overlap(chunk_size: int) -> int:
+    """
+    Returns the appropriate overlap based on chunk size.
+    """
     return 50 if chunk_size <= 256 else 200
 
 def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[str, List[str]]:
@@ -28,6 +31,9 @@ def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[
     return {k: list(v) for k, v in label_name_dict.items()}
 
 def process_data_recursive_langchain(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str, bm25_values: dict) -> List[Tuple[int, int, int, float, float]]:
+    """
+    Processes the data by chunking, embedding, and generating documents using the RecursiveCharacterTextSplitter.
+    """
     chunk_stats = []
 
     for chunk_length in chunk_lengths:

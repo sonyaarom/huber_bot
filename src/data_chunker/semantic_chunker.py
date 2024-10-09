@@ -98,6 +98,9 @@ def adaptive_semantic_chunk(text: str, min_chunk_size: int = 100, max_chunk_size
 
 
 def chunk_dataframe(data: pd.DataFrame, chunk_size: int) -> Generator[pd.DataFrame, None, None]:
+    """
+    Chunks the input DataFrame into smaller chunks of the specified size.
+    """
     logger.info(f"Starting to chunk dataframe with chunk size: {chunk_size}")
     
     initial_row_count = len(data)
