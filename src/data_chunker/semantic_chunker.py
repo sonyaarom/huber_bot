@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize GLiNER model
 ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
-labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
+labels = ["person", "course", "date",  "research_project", "address", "organisation", "phone_number", "url", "other"]
 
 def get_overlap(chunk_size: int) -> int:
     """

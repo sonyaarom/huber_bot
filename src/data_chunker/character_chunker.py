@@ -11,7 +11,7 @@ logger = getLogger(__name__)
 
 # Initialize GLiNER model
 ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
-labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
+labels = ["person", "course", "date",  "research_project", "address", "organisation", "phone_number", "url", "other"]
 
 def chunk_text(text: str, chunk_length: int, overlap: int, min_length: int = 50) -> List[str]:
     """
@@ -48,6 +48,9 @@ def convert_entities_to_label_name_dict(entities: List[Dict[str, Any]]) -> Dict[
 
 
 def process_data_tokens(df: pd.DataFrame, chunk_lengths: List[int], embed_model: Any, embed_model_name: str, base_path: str, bm25_values: dict) -> List[Tuple[int, int, int, float, float]]:
+    """
+    Processes the data by chunking, embedding, and generating documents.
+    """
     chunk_stats = []
 
     for chunk_length in chunk_lengths:

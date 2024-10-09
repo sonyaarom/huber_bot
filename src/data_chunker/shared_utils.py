@@ -301,32 +301,20 @@ def generate_documents(df: pd.DataFrame, chunk_size: int, doc_type: str) -> List
     return documents
 
 def create_vocabulary(df: pd.DataFrame, text_column: str) -> Dict[str, int]:
+    """
+    Creates a vocabulary from the input DataFrame.
+
+    Args:
+        df (pd.DataFrame): Input DataFrame containing the text data.
+        text_column (str): Name of the column containing the text data.
+
+    Returns:
+        Dict[str, int]: A dictionary with words as keys and their indices as values.
+    """
     all_words = set()
     for doc in df[text_column]:
         all_words.update(doc.lower().split())
     return {word: i for i, word in enumerate(all_words)}
-
-# def apply_bm25_sparse_vectors(df: pd.DataFrame, text_column: str) -> pd.DataFrame:
-#     vocab = create_vocabulary(df, text_column)
-#     corpus = df[text_column].apply(lambda x: x.lower().split()).tolist()
-#     bm25 = BM25Okapi(corpus)
-    
-#     def get_bm25_sparse_vector(doc):
-#         doc_terms = Counter(doc.lower().split())
-#         vector = {}
-#         for term in doc_terms:
-#             if term in vocab and term in bm25.idf:
-#                 idf = bm25.idf.get(term, 0)
-#                 tf = doc_terms[term]
-#                 doc_len = len(doc.split())
-#                 numerator = tf * (bm25.k1 + 1)
-#                 denominator = tf + bm25.k1 * (1 - bm25.b + bm25.b * doc_len / bm25.avgdl)
-#                 score = idf * (numerator / denominator)
-#                 vector[vocab[term]] = float(score)
-#         return vector
-    
-#     df['bm25_sparse_vector'] = df[text_column].apply(get_bm25_sparse_vector)
-#     return df
 
 def save_documents_to_json(docs: List[dict], chunk_size: int, model_name: str, doc_type: str, base_path: str) -> None:
     """

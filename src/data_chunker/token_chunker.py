@@ -10,7 +10,7 @@ import numpy as np
 from collections import defaultdict
 
 ner_model = GLiNER.from_pretrained("urchade/gliner_small-v2.1")
-labels = ["person", "course", "date", "research_paper", "research_project", "teams", "city", "address", "organisation", "phone_number", "url", "other"]
+labels = ["person", "course", "date",  "research_project", "address", "organisation", "phone_number", "url", "other"]
 logger = getLogger(__name__)
 
 def get_overlap(chunk_length: int) -> int:
