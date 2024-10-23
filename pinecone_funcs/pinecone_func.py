@@ -95,82 +95,75 @@ def format_sparse_vector(sparse_dict: Dict[str, float]) -> Dict[str, List]:
     return {"indices": indices, "values": values}
 
 
-def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], index_name: str,
-                       project_name: str, metric: str = 'cosine', host: str = None) -> None:
+def upload_to_pinecone(documents: Dict[int, List[Dict[str, Any]]], pc: Pinecone, 
+                      index_name: str,  # Now accepting index_name directly
+                      embedding_model_name: str, doc_type: str, project_name: str, 
+                      metric: str = 'cosine', host = 'us-east-1', cloud = 'aws') -> None:
     """
-    Uploads document embeddings and sparse vectors to an existing Pinecone index.
-    
-    Args:
-    documents (Dict[int, List[Dict[str, Any]]]): Dictionary of documents to upload, keyed by chunk size.
-    index_name (str): Name of the Pinecone index.
-    project_name (str): Name of the project for metadata.
-    metric (str): Distance metric used by the index (default: 'cosine').
-    host (str): Host URL for the Pinecone index.
-
-    Returns:
-    None
+    Uploads document embeddings and sparse vectors to a Pinecone index.
+    Now accepts index_name directly to ensure consistency.
     """
     logger.info(f"Starting upload process to Pinecone for project {project_name} with metric: {metric}")
-    # Access the existing index
+    logger.info(f"Using provided index name: {index_name}")
+    
     try:
-        index = pinecone.Index(index_name)
-    except Exception as e:
-        logger.error(f"Error accessing index {index_name}: {str(e)}")
-        return
+        # Access the index
+        index = pc.Index(index_name)
+        
+        # Process documents for each chunk size
+        for chunk_size, docs in documents.items():
+            if not docs:
+                logger.warning(f"No documents found for chunk size {chunk_size}. Skipping.")
+                continue
 
-    for chunk_size, docs in documents.items():
-        if not docs:
-            logger.warning(f"No documents found for chunk size {chunk_size}. Skipping.")
-            continue
+            # Validate and clean vectors
+            cleaned_docs = []
+            for doc in docs:
+                try:
+                    cleaned_vector = validate_vector(doc['values'])
+                    cleaned_doc = doc.copy()
+                    cleaned_doc['values'] = cleaned_vector
+                    cleaned_docs.append(cleaned_doc)
+                except Exception as e:
+                    logger.error(f"Error cleaning vector for document {doc.get('unique_id', 'unknown')}: {str(e)}")
 
-        # Validate and clean vectors
-        cleaned_docs = []
-        for doc in docs:
-            try:
-                cleaned_vector = validate_vector(doc['values'])
-                cleaned_doc = doc.copy()
-                cleaned_doc['values'] = cleaned_vector
-                cleaned_docs.append(cleaned_doc)
-            except Exception as e:
-                logger.error(f"Error cleaning vector for document {doc.get('unique_id', 'unknown')}: {str(e)}")
+            if not cleaned_docs:
+                logger.warning(f"No valid documents after cleaning for chunk size {chunk_size}. Skipping.")
+                continue
 
-        if not cleaned_docs:
-            logger.warning(f"No valid documents after cleaning for chunk size {chunk_size}. Skipping.")
-            continue
-
-        # Prepare vectors to upsert
-        vectors_to_upsert = []
-        for doc in cleaned_docs:
-            vector = {
-                'id': doc['unique_id'],
-                'values': doc['values'],
-                'metadata': {
-                    **doc.get('metadata', {}),
-                    "chunk_size": chunk_size,
-                    "project": project_name
+            # Prepare vectors to upsert
+            vectors_to_upsert = []
+            for doc in cleaned_docs:
+                vector = {
+                    'id': doc['unique_id'],
+                    'values': doc['values'],
+                    'metadata': {
+                        **doc.get('metadata', {}),
+                        "chunk_size": chunk_size,
+                        "project": project_name
+                    }
                 }
-            }
-            # Format and add sparse values if they exist
-            if 'sparse_values' in doc and doc['sparse_values']:
-                vector['sparse_values'] = format_sparse_vector(doc['sparse_values'])
-            vectors_to_upsert.append(vector)
+                if 'sparse_values' in doc and doc['sparse_values']:
+                    vector['sparse_values'] = format_sparse_vector(doc['sparse_values'])
+                vectors_to_upsert.append(vector)
 
-        # Upsert vectors in batches
-        batch_size = 100
-        total_uploaded = 0
-        for i in tqdm(range(0, len(vectors_to_upsert), batch_size), desc=f"Uploading to {index_name}"):
-            batch = vectors_to_upsert[i:i+batch_size]
-            try:
-                index.upsert(vectors=batch)
-                total_uploaded += len(batch)
-            except Exception as e:
-                logger.error(f"Error upserting batch to index {index_name}: {str(e)}")
-                logger.info(f"Successfully uploaded {total_uploaded} documents before error occurred.")
-                break
-        else:
-            logger.info(f"Successfully uploaded all {total_uploaded} documents to index '{index_name}'")
+            # Upsert vectors in batches
+            batch_size = 100
+            total_uploaded = 0
+            for i in tqdm(range(0, len(vectors_to_upsert), batch_size), desc=f"Uploading to {index_name}"):
+                batch = vectors_to_upsert[i:i+batch_size]
+                try:
+                    index.upsert(vectors=batch)
+                    total_uploaded += len(batch)
+                except Exception as e:
+                    logger.error(f"Error upserting batch to index {index_name}: {str(e)}")
+                    raise
 
-    logger.info("Upload process completed.")
+            logger.info(f"Successfully uploaded {total_uploaded} documents to index '{index_name}'")
+            
+    except Exception as e:
+        logger.error(f"Error during upload process: {str(e)}")
+        raise
 
 
 

@@ -42,12 +42,12 @@ def log_chunk_stats(chunk_type: str, stats: List[Tuple[int, int, int, float, flo
 from shared_utils import get_embeddings, embed_dataframe
 #Example options for encode model: "all-MiniLM-L6-v2", "hf", 'Snowflake/snowflake-arctic-embed-l' 
 
-def main(chunk_types: List[str] = ['recursive'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
+def main(chunk_types: List[str] = ['char'], encode_model: str = "all-MiniLM-L6-v2", embed_model_name: str = 'all-mini'):
     try:
         load_dotenv()
         
         df_path = os.path.join(assets_dir, 'csv', 'data_subset.csv')
-        chunk_sizes = [256] 
+        chunk_sizes = [256, 512] 
         if embed_model_name == None:
             embed_model_name = encode_model
 
@@ -59,7 +59,7 @@ def main(chunk_types: List[str] = ['recursive'], encode_model: str = "all-MiniLM
 
         logger.info(f"Loading DataFrame from {df_path}")
         df = pd.read_csv(df_path)
-        df = df.sample(10)
+        
         logger.info(f"DataFrame loaded with {len(df)} rows")
         # Drop rows with NA values in the 'text' column
         initial_row_count = len(df)

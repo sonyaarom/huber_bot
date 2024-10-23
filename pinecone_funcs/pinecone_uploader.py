@@ -25,35 +25,95 @@ class VectorFileHandler(FileSystemEventHandler):
         self.metric = metric
         logger.info(f"VectorFileHandler initialized with embedding model: {embedding_model_name}, project: {project_name}, and metric: {metric}")
 
-    def process_file(self, file_path):
-        logger.info(f"Processing file: {file_path}")
+    def get_index_name_from_file(self, filename: str) -> tuple:
+        """
+        Extract index name components from filename.
+        Example: recursive-vectors-256chunksize-all-mini-sparse.json 
+        -> (recursive, 256, all-mini)
+        """
         try:
-            with open(file_path, 'r') as file:
-                documents = json.load(file)
+            filename = os.path.basename(filename)
+            parts = filename.replace('.json', '').split('-')
             
-            filename = os.path.basename(file_path)
-            filename_parts = filename.split('-')
+            # Extract doc_type (first part)
+            doc_type = parts[0]  # 'recursive'
             
-            # Extract doc_type and chunk_size
-            doc_type = filename_parts[0]
+            # Extract chunk size
             chunk_size = None
-            for part in filename_parts:
+            for part in parts:
                 if 'chunksize' in part:
                     chunk_size = int(part.replace('chunksize', ''))
                     break
             
-            if chunk_size is None:
-                raise ValueError(f"Couldn't extract chunk size from filename: {filename}")
+            if not chunk_size:
+                raise ValueError(f"Could not extract chunk size from filename: {filename}")
+                
+            # Construct the standardized index name
+            index_name = f"{self.embedding_model_name}-{doc_type}-{chunk_size}"
             
-            logger.info(f"Extracted doc_type: {doc_type}, chunk_size: {chunk_size}")
+            logger.info(f"Extracted index name: {index_name} from file: {filename}")
+            return index_name, doc_type, chunk_size
             
-            # Create a dictionary with chunk_size as key and documents as value
+        except Exception as e:
+            logger.error(f"Error parsing filename {filename}: {str(e)}")
+            raise
+
+    def process_file(self, file_path):
+        logger.info(f"Processing file: {file_path}")
+        try:
+            # First, verify that the embedding model name is in the filename
+            if self.embedding_model_name not in file_path:
+                logger.warning(f"Skipping file {file_path} as it doesn't match the embedding model {self.embedding_model_name}")
+                return
+
+            # Get index name and components from filename
+            index_name, doc_type, chunk_size = self.get_index_name_from_file(file_path)
+            
+            # Read the documents
+            with open(file_path, 'r') as file:
+                documents = json.load(file)
+            
+            if not documents:
+                logger.error(f"No documents found in file: {file_path}")
+                return
+                
+            # Create dictionary with chunk_size as key
             documents_dict = {chunk_size: documents}
             
-            # Call upload_to_pinecone with the dictionary, project name, and metric
-            upload_to_pinecone(documents_dict, self.pc, self.embedding_model_name, doc_type, self.project_name, self.metric)
+            # Get dimension from first document
+            dimension = len(documents[0]['values'])
             
-            logger.info(f"Successfully uploaded vectors from {file_path}")
+            # Use the exact same index name for both operations
+            try:
+                # Create/access index
+                index, is_new = create_pinecone_index(
+                    self.pc,
+                    index_name,  # Using the same index_name throughout
+                    dimension,
+                    self.project_name,
+                    metric=self.metric
+                )
+                
+                if not index:
+                    raise ValueError(f"Failed to create/access index: {index_name}")
+                
+                # Upload vectors using the same index name
+                upload_to_pinecone(
+                    documents_dict,
+                    self.pc,
+                    index_name=index_name,  # Pass the index_name explicitly
+                    embedding_model_name=self.embedding_model_name,
+                    doc_type=doc_type,
+                    project_name=self.project_name,
+                    metric=self.metric
+                )
+                
+                logger.info(f"Successfully uploaded vectors from {file_path} to index {index_name}")
+                
+            except Exception as e:
+                logger.error(f"Error during index operations: {str(e)}")
+                raise
+                
         except json.JSONDecodeError:
             logger.error(f"Error decoding JSON from file: {file_path}")
         except Exception as e:
@@ -176,7 +236,8 @@ def main():
     
     # Prioritize command-line argument, then environment variable, then default value
     api_key = args.api_key or os.getenv('PINECONE_API_KEY')
-    environment = os.getenv('PINECONE_ENVIRONMENT')
+    #environment = os.getenv('PINECONE_ENVIRONMENT')
+    environment = 'us-east-1'
     
     if not api_key or not environment:
         logger.error("Pinecone API key and environment must be set")
@@ -229,3 +290,5 @@ if __name__ == "__main__":
 
 #python pinecone_uploader.py --folder FOLDER --embedding_model EMBED_NAME  --project PROJECT_INTERNAL --metric dotproduct/euclidean/cosine  --api_key API_KEY
 #python pinecone_uploader.py --delete all --embedding_model EMBED_NAME --api_key API_KEY
+#python pinecone_uploader.py --delete all --embedding_model all-mini --api_key 65e4e8e1-ee36-41e3-9544-8d0557ce5305
+#python pinecone_uploader.py --folder /Users/s.konchakova/Thesis/huber_bot/assets/docs --embedding_model all-mini --project huber --metric dotproduct --api_key 65e4e8e1-ee36-41e3-9544-8d0557ce5305
